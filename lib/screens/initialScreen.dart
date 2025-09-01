@@ -83,7 +83,7 @@ class _InitialScreenState extends State<InitialScreen>
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Image.asset(
-                      'assets/images/Logoteste.png',
+                      'assets/images/Logo.png',
                       width: MediaQuery.of(context).size.width * 0.44,
                       fit: BoxFit.contain,
                     ),
