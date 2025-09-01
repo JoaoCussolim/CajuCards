@@ -9,7 +9,7 @@ class RegisterScreen extends StatelessWidget {
       body: Container (
         decoration: BoxDecoration(
           image: DecorationImage(
-            image: AssetImage('assets/images/wood1.png'),
+            image: AssetImage('assets/images/woodBasic.png'),
             fit: BoxFit.cover
           )
         ),
@@ -31,7 +31,7 @@ class RegisterScreen extends StatelessWidget {
                     children: [
 
                       Image.asset(
-                        'nome'
+                        'assets/images/Logo.png'
                       ),
                       
                       const SizedBox(height: 20),
@@ -41,20 +41,41 @@ class RegisterScreen extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 64,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xF47F06),
-                          fontFamily: 'nome'
+                          color: Color.fromARGB(255, 244, 129, 6),
+                          fontFamily: 'VT323'
                         ),
                       ),
 
                       const Text(
                         'Bem-vindo(a) ao CajuCards!',
-                        style: TextStyle(fontSize: 20),
+                        style: TextStyle(
+                          fontSize: 64,
+                          fontWeight: FontWeight.w600,
+                          color: Color.fromARGB(255, 244, 129, 6),
+                          fontFamily: 'VT323'
+                        ),
                       ),
                       
                       const SizedBox(height: 40),
                       
-                      const Text('Já é um cajuicer?'),
-                      const Text('Faça seu login!'),
+                      const Text(
+                        'Já é um cajuicer?',
+                        style: TextStyle(
+                          fontSize: 50,
+                          fontWeight: FontWeight.w600,
+                          color: Color.fromARGB(255, 244, 117, 6),
+                          fontFamily: 'VT323'
+                        ),
+                        ),
+                      const Text(
+                        'Faça seu login!',
+                        style: TextStyle(
+                          fontSize: 50,
+                          fontWeight: FontWeight.w600,
+                          color: Color.fromARGB(255, 255, 156, 51),
+                          fontFamily: 'VT323'
+                        ),
+                        ),
                     ],
                   ),
                 )
