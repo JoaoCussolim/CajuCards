@@ -1,240 +1,337 @@
 import 'package:flutter/material.dart';
 
-class RegisterScreen extends StatelessWidget {
+class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
+
+  @override
+  State<RegisterScreen> createState() => _RegisterScreenState();
+}
+
+class _RegisterScreenState extends State<RegisterScreen> {
+  // Variáveis para controlar a visibilidade das senhas
+  bool _isNewPasswordObscured = true;
+  bool _isConfirmPasswordObscured = true;
+  final double tamanhoCastanha = 250.0;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/images/woodBasic.png'),
-            fit: BoxFit.cover,
-          ),
-        ),
-        child: Center(
-          child: Container(
-            width: 800,
-            padding: const EdgeInsets.all(40),
+      body: Stack(
+        children: [
+          Container(
             decoration: const BoxDecoration(
               image: DecorationImage(
-                image: AssetImage('assets/images/Livro.png'),
-                fit: BoxFit.fill,
+                image: AssetImage('assets/images/woodBasic.png'),
+                fit: BoxFit.cover,
               ),
             ),
-            child: Row(
-              children: [
-                // Coluna da esquerda (Logo e textos)
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Image.asset(
-                        'assets/images/Logo.png',
-                      ),
-                      const SizedBox(height: 20),
-                      // Textos de boas-vindas
-                      const Text(
-                        'Olá novo cajuicer!\nBem-vindo(a) ao\nCajuCards!',
-                        style: TextStyle(
-                          fontSize: 44,
-                          fontWeight: FontWeight.w600,
-                          color: Color.fromARGB(255, 244, 129, 6),
-                          fontFamily: 'VT323',
-                        ),
-                      ),
-                      const SizedBox(height: 40),
-                      // Textos de login
-                      const Text(
-                        'Já é um cajuicer?',
-                        style: TextStyle(
-                          fontSize: 30,
-                          fontWeight: FontWeight.w600,
-                          color: Color.fromARGB(255, 244, 117, 6),
-                          fontFamily: 'VT323',
-                        ),
-                      ),
-                      const Text(
-                        'Faça seu login!',
-                        style: TextStyle(
-                          fontSize: 30,
-                          fontWeight: FontWeight.w600,
-                          color: Color.fromARGB(255, 255, 156, 51),
-                          fontFamily: 'VT323',
-                        ),
-                      ),
-                    ],
+            child: Center(
+              child: Container(
+                width: 800,
+                height: 600,
+                padding: const EdgeInsets.all(40),
+                decoration: const BoxDecoration(
+                  image: DecorationImage(
+                    image: AssetImage('assets/images/Livro.png'),
+                    fit: BoxFit.fill,
                   ),
                 ),
-                // Adiciona a linha divisória vertical
-                Container(
-                  width: 2,
-                  color: Colors.black,
-                  margin: const EdgeInsets.symmetric(horizontal: 20),
-                ),
-                // Coluna da direita (Formulário de cadastro)
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Título "Cadastro"
-                      const Text(
-                        'Cadastro',
-                        style: TextStyle(
-                          fontSize: 30,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black,
-                          fontFamily: 'VT323',
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 20),
-                      // Campos de texto e botão (você pode criar funções auxiliares para eles)
-                      _buildTextField('Nome de Usuário'),
-                      _buildTextField('E-mail'),
-                      _buildPasswordTextField('Nova Senha'),
-                      _buildPasswordTextField('Confirme a Senha'),
-                      const SizedBox(height: 20),
-                      ElevatedButton(
-                        onPressed: () {},
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFF0953C),
-                          padding: const EdgeInsets.symmetric(vertical: 15),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                child: Row(
+                  children: [
+                    // Coluna da esquerda (Logo e textos)
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const SizedBox(height: 20), // Espaço no topo
+                          Image.asset(
+                            'assets/images/Logo.png',
+                            height: 150, // Controla a altura da logo
+                            fit: BoxFit.contain,
                           ),
-                        ),
-                        child: const Text(
-                          'Cadastrar',
-                          style: TextStyle(color: Colors.white, fontSize: 18),
-                        ),
+                          const SizedBox(height: 20),
+                          // Textos de boas-vindas com borda
+                          _buildStrokedText(
+                            'Olá novo cajuicer!\nBem-vindo(a) ao\nCajuCards!',
+                            44,
+                            const Color.fromARGB(255, 244, 129, 6),
+                            2.0,
+                            const Color(0xFF91280A),
+                          ),
+                          const Spacer(), // Empurra o conteúdo abaixo para o final
+                          // Textos de login com borda
+                          _buildStrokedText(
+                            'Já é um cajuicer?',
+                            30,
+                            const Color.fromARGB(255, 244, 117, 6),
+                            1.5,
+                            const Color(0xFF91280A),
+                          ),
+                          _buildStrokedText(
+                            'Faça seu login!',
+                            30,
+                            const Color.fromARGB(255, 255, 156, 51),
+                            1.5,
+                            const Color(0xFF91280A),
+                          ),
+                          const SizedBox(height: 20), // Espaço na base
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                    // Adiciona a linha divisória vertical
+                    Container(
+                      width: 2,
+                      color: Colors.black,
+                      margin: const EdgeInsets.symmetric(horizontal: 20),
+                    ),
+                    // Coluna da direita (Formulário de cadastro)
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          // Título "Cadastro"
+                          Image.asset('assets/images/Cadastro.png',
+                              width: 200),
+                          const SizedBox(height: 20),
+
+                          // Campos de texto e botão
+                          _buildTextField('Nome de Usuário'),
+                          _buildTextField('E-mail'),
+                          _buildPasswordTextField(
+                            'Nova Senha',
+                            _isNewPasswordObscured,
+                            () {
+                              setState(() {
+                                _isNewPasswordObscured =
+                                    !_isNewPasswordObscured;
+                              });
+                            },
+                          ),
+                          _buildPasswordTextField(
+                            'Confirme a Senha',
+                            _isConfirmPasswordObscured,
+                            () {
+                              setState(() {
+                                _isConfirmPasswordObscured =
+                                    !_isConfirmPasswordObscured;
+                              });
+                            },
+                          ),
+                          const SizedBox(height: 20),
+                          _buildRegisterButton(),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
+            ),
+          ),
+          Positioned(
+            top: 10,
+            left: 10,
+            child: Image.asset(
+              'assets/images/Castanha1Cima.png',
+              width: tamanhoCastanha,
+            ),
+          ),
+          Positioned(
+            top: 10,
+            right: 10,
+            child: Image.asset(
+              'assets/images/Castanha2Cima.png',
+              width: tamanhoCastanha,
+            ),
+          ),
+          Positioned(
+            bottom: 10,
+            left: 10,
+            child: Image.asset(
+              'assets/images/Castanha1Baixo.png',
+              width: tamanhoCastanha,
+            ),
+          ),
+          Positioned(
+            bottom: 10,
+            right: 10,
+            child: Image.asset(
+              'assets/images/Castanha2Baixo.png',
+              width: tamanhoCastanha,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Função para construir texto com borda (stroke)
+  Widget _buildStrokedText(String text, double fontSize, Color fillColor,
+      double strokeWidth, Color strokeColor) {
+    return Stack(
+      children: <Widget>[
+        // Texto da borda (contorno)
+        Center(
+          child: Text(
+            text,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: fontSize,
+              fontFamily: 'VT323',
+              fontWeight: FontWeight.w600,
+              foreground: Paint()
+                ..style = PaintingStyle.stroke
+                ..strokeWidth = strokeWidth
+                ..color = strokeColor,
             ),
           ),
         ),
-      ),
+        // Texto do preenchimento
+        Center(
+          child: Text(
+            text,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: fontSize,
+              fontFamily: 'VT323',
+              fontWeight: FontWeight.w600,
+              color: fillColor,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
-  // Funções para construir os campos de texto, para evitar repetição de código
+  // Função para construir os campos de texto com imagem de fundo
   Widget _buildTextField(String labelText) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: TextField(
-        decoration: InputDecoration(
-          labelText: labelText,
-        ),
+      padding: const EdgeInsets.symmetric(vertical: 5.0),
+      child: Stack(
+        alignment: Alignment.centerLeft,
+        children: [
+          // IMPORTANTE: Substitua 'assets/images/your_textfield_image.png' pelo caminho da sua imagem para o campo
+          Image.asset('assets/images/fundoInput.png'),
+          Padding(
+            padding: const EdgeInsets.only(
+              left: 15,
+              right: 15,
+              bottom: 5,
+            ), // Ajuste o padding conforme necessário
+            child: TextField(
+              decoration: InputDecoration(
+                hintText: labelText,
+                hintStyle: const TextStyle(
+                  color: Color.fromARGB(255, 255, 255, 255),
+                  fontFamily: 'VT323',
+                  fontSize: 20,
+                ),
+                // Remove a cor de preenchimento e as bordas
+                filled: false,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+              ),
+              style: const TextStyle(
+                color: Color.fromARGB(255, 255, 255, 255),
+                fontFamily: 'VT323',
+                fontSize: 20,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildPasswordTextField(String labelText) {
+  // Função para construir os campos de senha com imagem de fundo e ícone de visibilidade
+  Widget _buildPasswordTextField(
+    String labelText,
+    bool isObscured,
+    VoidCallback toggleVisibility,
+  ) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: TextField(
-        obscureText: true,
-        decoration: InputDecoration(
-          labelText: labelText,
-          suffixIcon: const Icon(Icons.visibility),
-        ),
+      padding: const EdgeInsets.symmetric(vertical: 5.0),
+      child: Stack(
+        alignment: Alignment.centerLeft,
+        children: [
+          // IMPORTANTE: Substitua 'assets/images/your_textfield_image.png' pelo caminho da sua imagem para o campo
+          Image.asset('assets/images/fundoInput.png'),
+          Padding(
+            padding: const EdgeInsets.only(
+              left: 15,
+              right: 5,
+              bottom: 5,
+            ), // Ajuste o padding
+            child: TextField(
+              obscureText: isObscured,
+              decoration: InputDecoration(
+                hintText: labelText,
+                hintStyle: const TextStyle(
+                  color: Color.fromARGB(255, 255, 255, 255),
+                  fontFamily: 'VT323',
+                  fontSize: 20,
+                ),
+                filled: false,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    isObscured ? Icons.visibility_off : Icons.visibility,
+                    color: const Color.fromARGB(255, 255, 255, 255),
+                  ),
+                  onPressed: toggleVisibility,
+                ),
+              ),
+              style: const TextStyle(
+                color: Color.fromARGB(255, 255, 255, 255),
+                fontFamily: 'VT323',
+                fontSize: 20,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Função para construir o botão de cadastro com imagem de fundo
+  Widget _buildRegisterButton() {
+    return SizedBox(
+      height: 60, // Defina uma altura para o botão
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // IMPORTANTE: Substitua 'assets/images/your_button_image.png' pelo caminho da sua imagem para o botão
+          Image.asset('assets/images/fundoInput.png'),
+          SizedBox.expand(
+            child: ElevatedButton(
+              onPressed: () {
+                // Lógica de cadastro aqui
+              },
+              style: ElevatedButton.styleFrom(
+                // Deixa o botão completamente transparente
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text(
+                'Cadastrar',
+                style: TextStyle(
+                  color: Color.fromARGB(
+                      255, 255, 255, 255), // Cor do texto mais escura, como na imagem
+                  fontSize: 22,
+                  fontFamily: 'VT323',
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
-
-// import 'package:flutter/material.dart';
-
-// class RegisterScreen extends StatelessWidget {
-//   const RegisterScreen({super.key});
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       body: Container (
-//         decoration: BoxDecoration(
-//           image: DecorationImage(
-//             image: AssetImage('assets/images/woodBasic.png'),
-//             fit: BoxFit.cover
-//           )
-//         ),
-//         child: Center(
-//           child: Container(
-//             width: 800,
-//             padding: const EdgeInsets.all(40),
-//             decoration: BoxDecoration(
-//               image: DecorationImage(
-//                 image: AssetImage('assets/images/Livro.png')
-//               )
-//             ),
-//             child: Row(
-//               children: [
-//                 Expanded(
-//                   child: Column(
-//                     crossAxisAlignment: CrossAxisAlignment.start,
-//                     mainAxisAlignment: MainAxisAlignment.center,
-//                     children: [
-
-//                       Image.asset(
-//                         'assets/images/Logo.png'
-//                       ),
-                      
-//                       const SizedBox(height: 20),
-
-//                       const Text(
-//                         'Olá novo cajuicer! Bem-vindo(a) ao CajuCards!',
-//                         style: TextStyle(
-//                           fontSize: 44,
-//                           fontWeight: FontWeight.w600,
-//                           color: Color.fromARGB(255, 244, 129, 6),
-//                           fontFamily: 'VT323'
-//                         ),
-//                       ),
-
-//                       // const Text(
-//                       //   'Bem-vindo(a) ao CajuCards!',
-//                       //   style: TextStyle(
-//                       //     fontSize: 44,
-//                       //     fontWeight: FontWeight.w600,
-//                       //     color: Color.fromARGB(255, 244, 129, 6),
-//                       //     fontFamily: 'VT323'
-//                       //   ),
-//                       // ),
-                      
-//                       const SizedBox(height: 40),
-                      
-//                       const Text(
-//                         'Já é um cajuicer?',
-//                         style: TextStyle(
-//                           fontSize: 30,
-//                           fontWeight: FontWeight.w600,
-//                           color: Color.fromARGB(255, 244, 117, 6),
-//                           fontFamily: 'VT323'
-//                         ),
-//                         ),
-//                       const Text(
-//                         'Faça seu login!',
-//                         style: TextStyle(
-//                           fontSize: 30,
-//                           fontWeight: FontWeight.w600,
-//                           color: Color.fromARGB(255, 255, 156, 51),
-//                           fontFamily: 'VT323'
-//                         ),
-//                         ),
-//                     ],
-//                   ),
-//                 )
-//               ],
-//             )
-//           )
-//           )
-//         )
-//       );
-//   }
-// }
