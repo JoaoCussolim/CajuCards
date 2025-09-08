@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cajucards/screens/registerScreen.dart';
 import 'package:cajucards/screens/initialScreen.dart';
+import 'package:cajucards/screens/loginScreen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -13,7 +14,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return const MaterialApp(
       title: 'CajuCards',
-      home: RegisterScreen(),
+      home: LoginScreen(),
       debugShowCheckedModeBanner: false,
     );
   }
