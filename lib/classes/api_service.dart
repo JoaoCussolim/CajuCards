@@ -4,7 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ApiService {
   final String _baseUrl =
-      'http://10.0.2.2:3001/api';
+      'https://cajucards-api.onrender.com/api';
 
   String? get _accessToken {
     final session = Supabase.instance.client.auth.currentSession;
