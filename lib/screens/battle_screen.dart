@@ -1,107 +1,152 @@
+import 'dart:async'; // NOVO: Import para usar o Timer
 import 'package:flutter/material.dart';
+import 'package:cajucards/classes/api_service.dart';
+import 'package:cajucards/classes/player.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; // NOVO: Import do Supabase
 
-// --- Constantes e Variáveis Globais ---
-const Color kBackgroundColor = Color(0xFF2E2E2E);
-const Color kAppBarTextColor = Color(0xFF4B2D18);
-const Color kButtonTextColor = Colors.white;
-const Color kSelectedNavColor = Color(0xFFF98B25);
-const Color kDefaultNavColor = Color(0xFF8B5E3C);
-const Color kDividerColor = Color(0xFF6E4A2E);
-
-const String kPixelFont = 'VT323-Regular';
-final double tamanhoCastanha = 180.0;
-
-void main() {
-  runApp(const MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class BattleScreen extends StatefulWidget {
+  const BattleScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return const MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: BattleScreen(),
-    );
-  }
+  State<BattleScreen> createState() => _BattleScreenState();
 }
 
-class BattleScreen extends StatelessWidget {
-  const BattleScreen({super.key});
+class _BattleScreenState extends State<BattleScreen> {
+  final ApiService _apiService = ApiService();
+  Player? _player;
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserProfileWithRetry(); // ALTERADO: Chamando a nova função com paciência
+  }
+
+  // FUNÇÃO ATUALIZADA: Agora ela espera a sessão do Supabase ficar pronta
+  Future<void> _fetchUserProfileWithRetry() async {
+    int attempts = 0;
+    const maxAttempts = 15; // Tenta por até 3 segundos (15 * 200ms)
+
+    Timer.periodic(const Duration(milliseconds: 200), (timer) async {
+      final session = Supabase.instance.client.auth.currentSession;
+
+      // Se a sessão estiver pronta, busca os dados e para o timer
+      if (session != null) {
+        timer.cancel();
+        try {
+          final userData = await _apiService.getUserProfile();
+          if (mounted) {
+            setState(() {
+              _player = Player.fromJson(userData);
+              _isLoading = false;
+            });
+          }
+        } catch (e) {
+          if (mounted) {
+            setState(() {
+              _error = 'Falha ao carregar dados do cajuicer.';
+              _isLoading = false;
+            });
+          }
+        }
+      } 
+      // Se a sessão não estiver pronta, incrementa a tentativa
+      else {
+        attempts++;
+        if (attempts >= maxAttempts) {
+          timer.cancel();
+          if (mounted) {
+            setState(() {
+              _error = 'Sessão de usuário não encontrada. Faça login novamente.';
+              _isLoading = false;
+            });
+          }
+        }
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kBackgroundColor,
-      body: SafeArea(
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            // 1. Fundo
-            Image.asset('assets/images/WoodBasic.png', fit: BoxFit.cover, width: double.infinity, height: double.infinity),
-
-            Positioned(
-              top: 140,
-              left: 40,
-              child: Image.asset('assets/images/Castanha1Cima.png', width: tamanhoCastanha),
-            ),
-            Positioned(
-              top: 140,
-              right: 40,
-              child: Image.asset('assets/images/Castanha2Cima.png', width: tamanhoCastanha),
-            ),
-            Positioned(
-              bottom: 120,
-              left: 40,
-              child: Image.asset('assets/images/Castanha1Baixo.png', width: tamanhoCastanha),
-            ),
-            Positioned(
-              bottom: 120,
-              right: 40,
-              child: Image.asset('assets/images/Castanha2Baixo.png', width: tamanhoCastanha),
-            ),
-
-            // 3. Conteúdo Principal da Tela
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24.0, horizontal: 24.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // AJUSTE DE ALINHAMENTO FEITO AQUI
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      const Expanded(
-                        child: _TopBar(
-                          playerName: "Miguelzinho",
-                          coins: 500,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      // Envolvemos a engrenagem num Padding para subir ela um pouco
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 6.0),
-                        child: Image.asset(
-                          'assets/images/Gear.png',
-                          width: 45,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const _StartButton(),
-                  const _BottomNavBar(),
-                ],
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset('assets/images/WoodBasic.png', fit: BoxFit.cover),
+          if (_isLoading)
+            const Center(child: CircularProgressIndicator(color: Colors.white))
+          else if (_error != null)
+            Center(
+              child: Text(
+                _error!,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontFamily: 'VT323',
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold
+                ),
+              ),
+            )
+          else if (_player != null)
+            _buildMainContent()
+          else
+            const Center(
+              child: Text(
+                'Nenhum dado encontrado.',
+                style: TextStyle(color: Colors.white, fontFamily: 'VT323', fontSize: 24),
               ),
             ),
-          ],
-        ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMainContent() {
+    const double tamanhoCastanha = 180.0;
+    return SafeArea(
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned(top: 140, left: 40, child: Image.asset('assets/images/Castanha1Cima.png', width: tamanhoCastanha)),
+          Positioned(top: 140, right: 40, child: Image.asset('assets/images/Castanha2Cima.png', width: tamanhoCastanha)),
+          Positioned(bottom: 120, left: 40, child: Image.asset('assets/images/Castanha1Baixo.png', width: tamanhoCastanha)),
+          Positioned(bottom: 120, right: 40, child: Image.asset('assets/images/Castanha2Baixo.png', width: tamanhoCastanha)),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24.0, horizontal: 24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: _TopBar(
+                        playerName: _player!.username,
+                        coins: _player!.cashewCoins,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6.0),
+                      child: Image.asset('assets/images/Gear.png', width: 45),
+                    ),
+                  ],
+                ),
+                const _StartButton(),
+                const _BottomNavBar(),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-// AJUSTE DE ALINHAMENTO FEITO AQUI
+
+// --- Widgets Internos da Tela (sem alterações) ---
+
 class _TopBar extends StatelessWidget {
   final String playerName;
   final int coins;
@@ -114,31 +159,20 @@ class _TopBar extends StatelessWidget {
       alignment: Alignment.center,
       children: [
         Image.asset('assets/images/userContainer.png'),
-        // Usamos fromLTRB para ter controle fino do padding (left, top, right, bottom)
         Padding(
           padding: const EdgeInsets.fromLTRB(25, 4, 20, 0),
           child: Row(
             children: [
               Text(
                 playerName,
-                style: const TextStyle(
-                  fontFamily: kPixelFont,
-                  // Fonte reduzida para caber corretamente
-                  fontSize: 32,
-                  color: kAppBarTextColor,
-                ),
+                style: const TextStyle(fontFamily: 'VT323', fontSize: 32, color: Color(0xFF4B2D18)),
               ),
               const Spacer(),
               Image.asset('assets/images/cajucoin.png', width: 28),
               const SizedBox(width: 10),
               Text(
                 coins.toString(),
-                style: const TextStyle(
-                  fontFamily: kPixelFont,
-                  // Fonte igualada à do nome para consistência
-                  fontSize: 32,
-                  color: kAppBarTextColor,
-                ),
+                style: const TextStyle(fontFamily: 'VT323', fontSize: 32, color: Color(0xFF4B2D18)),
               ),
             ],
           ),
@@ -148,25 +182,23 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-// Widget para o botão central
 class _StartButton extends StatelessWidget {
   const _StartButton();
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () {
-        print("Iniciar Partida clicado!");
-      },
+      onTap: () {},
       child: Stack(
         alignment: Alignment.center,
         children: [
-          Image.asset(
-            'assets/images/buttonBattle.png',
-            width: 400,
-          ),
+          Image.asset('assets/images/buttonBattle.png', width: 400),
           const Padding(
             padding: EdgeInsets.only(bottom: 8.0),
+            child: Text(
+              "Iniciar Partida",
+              style: TextStyle(fontFamily: 'VT323', fontSize: 36, color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -174,10 +206,9 @@ class _StartButton extends StatelessWidget {
   }
 }
 
-// Widget para a barra de navegação inferior
 class _BottomNavBar extends StatelessWidget {
   const _BottomNavBar();
-
+  
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -185,21 +216,11 @@ class _BottomNavBar extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          const _NavItem(
-            iconPath: 'assets/images/shopIcon.png',
-            label: 'Loja',
-          ),
-          Container(height: 50, width: 2, color: kDividerColor),
-          const _NavItem(
-            iconPath: 'assets/images/battleIcon.png',
-            label: 'Batalha',
-            isSelected: true,
-          ),
-          Container(height: 50, width: 2, color: kDividerColor),
-          const _NavItem(
-            iconPath: 'assets/images/matchIcon.png',
-            label: 'Partidas',
-          ),
+          const _NavItem(iconPath: 'assets/images/shopIcon.png', label: 'Loja'),
+          Container(height: 50, width: 2, color: const Color(0xFF6E4A2E)),
+          const _NavItem(iconPath: 'assets/images/battleIcon.png', label: 'Batalha', isSelected: true),
+          Container(height: 50, width: 2, color: const Color(0xFF6E4A2E)),
+          const _NavItem(iconPath: 'assets/images/matchIcon.png', label: 'Partidas'),
         ],
       ),
     );
@@ -211,15 +232,11 @@ class _NavItem extends StatelessWidget {
   final String label;
   final bool isSelected;
 
-  const _NavItem({
-    required this.iconPath,
-    required this.label,
-    this.isSelected = false,
-  });
+  const _NavItem({required this.iconPath, required this.label, this.isSelected = false});
 
   @override
   Widget build(BuildContext context) {
-    final color = isSelected ? kSelectedNavColor : kDefaultNavColor;
+    final color = isSelected ? const Color(0xFFF98B25) : const Color(0xFF8B5E3C);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -227,11 +244,7 @@ class _NavItem extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           label,
-          style: TextStyle(
-            fontFamily: kPixelFont,
-            fontSize: 18,
-            color: color,
-          ),
+          style: TextStyle(fontFamily: 'VT323', fontSize: 18, color: color),
         )
       ],
     );
