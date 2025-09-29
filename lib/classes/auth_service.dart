@@ -27,6 +27,7 @@ class AuthService {
         email: email,
         password: password,
         data: {'username': username},
+        emailRedirectTo: 'https://cajucardsconfirmado.netlify.app/'
       );
       
       if (response.user != null) {
