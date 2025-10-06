@@ -1,6 +1,7 @@
 import 'dart:async'; // NOVO: Import para usar o Timer
 import 'package:flutter/material.dart';
-import 'package:cajucards/api/api_service.dart';
+import 'package:cajucards/api/services/user_service.dart';
+import 'package:cajucards/api/api_client.dart';
 import 'package:cajucards/models/player.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'; // NOVO: Import do Supabase
 
@@ -12,7 +13,7 @@ class BattleScreen extends StatefulWidget {
 }
 
 class _BattleScreenState extends State<BattleScreen> {
-  final ApiService _apiService = ApiService();
+  final UserService _userService = UserService(ApiClient());
   Player? _player;
   bool _isLoading = true;
   String? _error;
@@ -35,10 +36,10 @@ class _BattleScreenState extends State<BattleScreen> {
       if (session != null) {
         timer.cancel();
         try {
-          final userData = await _apiService.getUserProfile();
+          final userData = await _userService.getUserProfile();
           if (mounted) {
             setState(() {
-              _player = Player.fromJson(userData);
+              _player = userData;
               _isLoading = false;
             });
           }
