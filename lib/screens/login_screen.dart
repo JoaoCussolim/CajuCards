@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cajucards/classes/auth_service.dart';
+import 'package:cajucards/api/services/auth_service.dart';
 import 'initial_screen.dart';
 import 'register_screen.dart'; // Importa a tela de registro
 

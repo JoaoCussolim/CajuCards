@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cajucards/classes/auth_service.dart';
+import 'package:cajucards/api/services/auth_service.dart';
 import 'package:cajucards/screens/login_screen.dart'; // NOVO: Importa a tela de login
 
 class RegisterScreen extends StatefulWidget {

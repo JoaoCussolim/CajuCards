@@ -1,11 +1,10 @@
-import 'card.dart'; // Reutilizamos a classe Card
+import 'card.dart';
 import 'player_summary.dart';
 
-// Representa uma carta usada na partida
 class CardInMatch {
   final String playerId;
   final int levelInMatch;
-  final Card card; // Objeto Card aninhado
+  final Card card;
 
   CardInMatch({
     required this.playerId,
@@ -22,7 +21,6 @@ class CardInMatch {
   }
 }
 
-// Representa os detalhes completos da partida
 class MatchDetails {
   final String id;
   final DateTime matchDate;

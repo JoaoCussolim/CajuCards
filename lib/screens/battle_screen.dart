@@ -1,7 +1,7 @@
 import 'dart:async'; // NOVO: Import para usar o Timer
 import 'package:flutter/material.dart';
-import 'package:cajucards/classes/api_service.dart';
-import 'package:cajucards/classes/player.dart';
+import 'package:cajucards/api/api_service.dart';
+import 'package:cajucards/models/player.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'; // NOVO: Import do Supabase
 
 class BattleScreen extends StatefulWidget {
