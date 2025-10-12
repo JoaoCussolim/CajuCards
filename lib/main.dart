@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cajucards/screens/register_screen.dart';
 import 'package:cajucards/screens/initial_screen.dart';
-import 'package:cajucards/screens/shop_screen.dart';
+import 'package:cajucards/screens/matchmaking_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 
@@ -12,7 +12,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return const MaterialApp(
       title: 'CajuCards',
-      home: ShopScreen(),
+      home: MatchmakingScreen(),
       debugShowCheckedModeBanner: false,
     );
   }
