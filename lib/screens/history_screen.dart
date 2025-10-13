@@ -177,7 +177,6 @@ class _MatchHistoryList extends StatelessWidget {
   }
 }
 
-// --- WIDGET CORRIGIDO ---
 // AQUI ESTÁ A MUDANÇA PRINCIPAL
 class _MatchHistoryCard extends StatelessWidget {
   final String opponentName;
