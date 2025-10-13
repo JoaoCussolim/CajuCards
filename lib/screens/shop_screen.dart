@@ -1,120 +1,88 @@
+import 'package:cajucards/screens/history_screen.dart';
 import 'package:flutter/material.dart';
-import 'battle_screen.dart'; // Importa a tela de batalha para navegação
+import 'package:provider/provider.dart';
+import 'package:cajucards/providers/player_provider.dart';
+import 'package:cajucards/models/player.dart';
+import 'battle_screen.dart'; 
 
-// Futuramente, você importará as outras telas aqui
-// import 'history_screen.dart';
-// import 'open_chest_screen.dart';
-
-class ShopScreen extends StatefulWidget {
+class ShopScreen extends StatelessWidget {
   const ShopScreen({super.key});
 
   @override
-  State<ShopScreen> createState() => _ShopScreenState();
-}
-
-class _ShopScreenState extends State<ShopScreen> {
-  // Dados estáticos como solicitado
-  final String _playerName = "Miguelzinho";
-  final int _playerCoins = 500;
-
-  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.asset('assets/images/WoodBasic.png', fit: BoxFit.cover),
-          _buildMainContent(),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: 24.0,
-                horizontal: 24.0,
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Expanded(
-                        child: _TopBar(
-                          playerName: _playerName,
-                          coins: _playerCoins,
-                        ),
-                      ),
-                      const SizedBox(width: 20),
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 6.0),
-                        child: Image.asset(
-                          'assets/images/Gear.png',
-                          width: 120,
-                        ),
-                      ),
-                    ],
+    return Consumer<PlayerProvider>(
+      builder: (context, playerProvider, child) {
+        return Scaffold(
+          body: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.asset('assets/images/WoodBasic.png', fit: BoxFit.cover),
+
+              if (playerProvider.isLoading)
+                const Center(
+                  child: CircularProgressIndicator(color: Colors.white),
+                )
+              else if (playerProvider.error != null)
+                Center(
+                  child: Text(
+                    playerProvider.error!,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontFamily: 'VT323',
+                      fontSize: 24,
+                    ),
                   ),
-                  const Flexible(child: Center(child: _ChestSelection())),
-                  const _BottomNavBar(),
-                ],
-              ),
-            ),
+                )
+              else if (playerProvider.player != null)
+                // Passamos o jogador para o método que constrói o conteúdo
+                _buildScreenContent(context, playerProvider.player!)
+              else
+                const Center(
+                  child: Text(
+                    'Nenhum dado de jogador encontrado.',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildMainContent() {
-    const double tamanhoCastanha = 240.0;
+  // Novo método que recebe o Player para construir a UI
+  Widget _buildScreenContent(BuildContext context, Player player) {
     return SafeArea(
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Positioned(
-            top: 140,
-            left: 40,
-            child: Image.asset(
-              'assets/images/Castanha1Cima.png',
-              width: tamanhoCastanha,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24.0, horizontal: 24.0),
+        child: Column(
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: _TopBar(
+                    // 4. Usamos os dados dinâmicos do jogador
+                    playerName: player.username,
+                    coins: player.cashewCoins,
+                  ),
+                ),
+                const SizedBox(width: 20),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6.0),
+                  child: Image.asset('assets/images/Gear.png', width: 120),
+                ),
+              ],
             ),
-          ),
-          Positioned(
-            top: 140,
-            right: 40,
-            child: Image.asset(
-              'assets/images/Castanha2Cima.png',
-              width: tamanhoCastanha,
-            ),
-          ),
-          Positioned(
-            bottom: 120,
-            left: 40,
-            child: Image.asset(
-              'assets/images/Castanha1Baixo.png',
-              width: tamanhoCastanha,
-            ),
-          ),
-          Positioned(
-            bottom: 120,
-            right: 40,
-            child: Image.asset(
-              'assets/images/Castanha2Baixo.png',
-              width: tamanhoCastanha,
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              vertical: 24.0,
-              horizontal: 24.0,
-            ),
-          ),
-        ],
+            // O conteúdo principal da loja (seleção de baús)
+            const Expanded(child: Center(child: _ChestSelection())),
+            const _BottomNavBar(),
+          ],
+        ),
       ),
     );
   }
 }
-
-// --- WIDGET ATUALIZADO ---
 
 class _TopBar extends StatelessWidget {
   final String playerName;
@@ -299,7 +267,13 @@ class _BottomNavBar extends StatelessWidget {
             iconPath: 'assets/images/matchIcon.png',
             label: 'Partidas',
             onTap: () {
-              print("Navegar para a HistoryScreen");
+              Navigator.pushReplacement(
+                context,
+                PageRouteBuilder(
+                  pageBuilder: (_, __, ___) => const HistoryScreen(),
+                  transitionDuration: Duration.zero,
+                ),
+              );
             },
           ),
         ],

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cajucards/api/services/auth_service.dart';
 import 'initial_screen.dart';
-import 'register_screen.dart'; // Importa a tela de registro
+import 'register_screen.dart';
+import 'package:provider/provider.dart';
+import 'package:cajucards/providers/player_provider.dart';
+import 'package:cajucards/screens/battle_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -70,14 +73,27 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = false);
 
     // 4. Trata o resultado
+
     if (result.success) {
-      _showSuccessToast('Login efetuado! Bem-vindo(a) de volta.');
-      // Navega para a tela de batalha após o sucesso
-      Navigator.of(currentContext).pushReplacement(
-        MaterialPageRoute(builder: (_) => const InitialScreen()),
+      final playerProvider = Provider.of<PlayerProvider>(
+        currentContext,
+        listen: false,
       );
+      final success = await playerProvider.fetchAndSetPlayer();
+
+      if (success) {
+        _showSuccessToast('Login efetuado! Bem-vindo(a) de volta.');
+        Navigator.of(currentContext).pushReplacement(
+          MaterialPageRoute(builder: (_) => const InitialScreen()),
+        );
+      } else {
+        setState(() => _isLoading = false);
+        _showErrorToast(
+          playerProvider.error ?? 'Não foi possível carregar seus dados.',
+        );
+      }
     } else {
-      // Exibe a mensagem de erro que vem do Supabase (ex: "Invalid login credentials")
+      setState(() => _isLoading = false);
       _showErrorToast(result.errorMessage ?? 'E-mail ou senha inválidos.');
     }
   }

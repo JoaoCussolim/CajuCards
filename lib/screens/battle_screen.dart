@@ -1,120 +1,59 @@
-import 'dart:async'; // NOVO: Import para usar o Timer
+import 'package:cajucards/screens/matchmaking_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart'; // Importe o provider
+import 'package:cajucards/providers/player_provider.dart'; // Importe seu provider
+import 'package:cajucards/models/player.dart';
 import 'shop_screen.dart';
 import 'history_screen.dart';
-import 'package:cajucards/api/services/user_service.dart';
-import 'package:cajucards/api/api_client.dart';
-import 'package:cajucards/models/player.dart';
-import 'package:supabase_flutter/supabase_flutter.dart'; // NOVO: Import do Supabase
 
-class BattleScreen extends StatefulWidget {
+class BattleScreen extends StatelessWidget {
   const BattleScreen({super.key});
 
   @override
-  State<BattleScreen> createState() => _BattleScreenState();
-}
-
-class _BattleScreenState extends State<BattleScreen> {
-  final UserService _userService = UserService(ApiClient());
-  Player? _player;
-  bool _isLoading = true;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchUserProfileWithRetry(); // ALTERADO: Chamando a nova função com paciência
-  }
-
-  // FUNÇÃO ATUALIZADA: Agora ela espera a sessão do Supabase ficar pronta
-  Future<void> _fetchUserProfileWithRetry() async {
-    int attempts = 0;
-    const maxAttempts = 15; // Tenta por até 3 segundos (15 * 200ms)
-
-    Timer.periodic(const Duration(milliseconds: 200), (timer) async {
-      final session = Supabase.instance.client.auth.currentSession;
-
-      // Se a sessão estiver pronta, busca os dados e para o timer
-      if (session != null) {
-        timer.cancel();
-        try {
-          final userData = await _userService.getUserProfile();
-          if (mounted) {
-            setState(() {
-              _player = userData;
-              _isLoading = false;
-            });
-          }
-        } catch (e) {
-          if (mounted) {
-            setState(() {
-              _error = 'Falha ao carregar dados do cajuicer.';
-              _isLoading = false;
-            });
-          }
-        }
-      }
-      // Se a sessão não estiver pronta, incrementa a tentativa
-      else {
-        attempts++;
-        if (attempts >= maxAttempts) {
-          timer.cancel();
-          if (mounted) {
-            setState(() {
-              _error =
-                  'Sessão de usuário não encontrada. Faça login novamente.';
-              _isLoading = false;
-            });
-          }
-        }
-      }
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.asset(
-            'assets/images/WoodBasic.png',
-            fit: BoxFit.cover,
-            alignment: Alignment.bottomCenter,
+    return Consumer<PlayerProvider>(
+      builder: (context, playerProvider, child) {
+        return Scaffold(
+          body: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.asset(
+                'assets/images/WoodBasic.png',
+                fit: BoxFit.cover,
+                alignment: Alignment.bottomCenter,
+              ),
+              if (playerProvider.isLoading)
+                const Center(
+                  child: CircularProgressIndicator(color: Colors.white),
+                )
+              else if (playerProvider.error != null)
+                Center(
+                  child: Text(
+                    playerProvider.error!,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontFamily: 'VT323',
+                      fontSize: 24,
+                    ),
+                  ),
+                )
+              else if (playerProvider.player != null)
+                _buildMainContent(context, playerProvider.player!)
+              else
+                const Center(
+                  child: Text(
+                    'Nenhum dado encontrado.',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+            ],
           ),
-          if (_isLoading)
-            const Center(child: CircularProgressIndicator(color: Colors.white))
-          else if (_error != null)
-            Center(
-              child: Text(
-                _error!,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontFamily: 'VT323',
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            )
-          else if (_player != null)
-            _buildMainContent()
-          else
-            const Center(
-              child: Text(
-                'Nenhum dado encontrado.',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontFamily: 'VT323',
-                  fontSize: 24,
-                ),
-              ),
-            ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildMainContent() {
+  Widget _buildMainContent(BuildContext context, Player player) {
     const double tamanhoCastanha = 240.0;
     return SafeArea(
       child: Stack(
@@ -165,8 +104,8 @@ class _BattleScreenState extends State<BattleScreen> {
                   children: [
                     Expanded(
                       child: _TopBar(
-                        playerName: _player!.username,
-                        coins: _player!.cashewCoins,
+                        playerName: player.username,
+                        coins: player.cashewCoins,
                       ),
                     ),
                     const SizedBox(width: 20),
@@ -245,7 +184,16 @@ class _StartButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () {},
+      onTap: () {
+        Navigator.pushReplacement(
+          context,
+          PageRouteBuilder(
+            pageBuilder: (_, __, ___) => const MatchmakingScreen(),
+            transitionDuration: Duration.zero,
+            reverseTransitionDuration: Duration.zero,
+          ),
+        );
+      },
       child: Stack(
         alignment: Alignment.center,
         children: [Image.asset('assets/images/buttonBattle.png', width: 600)],
@@ -284,7 +232,6 @@ class _BottomNavBar extends StatelessWidget {
             label: 'Batalha',
             isSelected: true,
             onTap: () {},
-            
           ),
           Container(height: 50, width: 2, color: const Color(0xFF6E4A2E)),
           _NavItem(

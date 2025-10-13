@@ -1,72 +1,89 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:cajucards/providers/player_provider.dart';
+import 'package:cajucards/models/player.dart';
 import 'battle_screen.dart';
 import 'shop_screen.dart';
 
-class HistoryScreen extends StatefulWidget {
+// A tela principal (HistoryScreen) continua igual, já estava certa.
+class HistoryScreen extends StatelessWidget {
   const HistoryScreen({super.key});
 
   @override
-  State<HistoryScreen> createState() => _HistoryScreenState();
-}
-
-class _HistoryScreenState extends State<HistoryScreen> {
-  // Dados estáticos para a tela
-  final String _playerName = "Miguelzinho";
-  final int _playerCoins = 500;
-
-  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          // 1. Imagem de fundo
-          Image.asset('assets/images/WoodBasic.png', fit: BoxFit.cover),
-
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: Column(
-                children: [
-                  // 2. Barra Superior (Player + Moedas + Config)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 24.0),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Expanded(
-                          child: _TopBar(
-                            playerName: _playerName,
-                            coins: _playerCoins,
-                          ),
-                        ),
-                        const SizedBox(width: 20),
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 6.0),
-                          child: Image.asset(
-                            'assets/images/Gear.png',
-                            width: 120,
-                          ),
-                        ),
-                      ],
+    return Consumer<PlayerProvider>(
+      builder: (context, playerProvider, child) {
+        return Scaffold(
+          body: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.asset('assets/images/WoodBasic.png', fit: BoxFit.cover),
+              if (playerProvider.isLoading)
+                const Center(
+                  child: CircularProgressIndicator(color: Colors.white),
+                )
+              else if (playerProvider.error != null)
+                Center(
+                  child: Text(
+                    playerProvider.error!,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontFamily: 'VT323',
+                      fontSize: 24,
                     ),
                   ),
+                )
+              else if (playerProvider.player != null)
+                _buildScreenContent(context, playerProvider.player!)
+              else
+                const Center(
+                  child: Text(
+                    'Nenhum dado de jogador encontrado.',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
-                  // 3. Conteúdo Central (Lista de Partidas Rolável)
-                  Expanded(child: _MatchHistoryList()),
-
-                  // 4. Barra de Navegação Inferior
-                  const _BottomNavBar(),
+  Widget _buildScreenContent(BuildContext context, Player player) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24.0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: _TopBar(
+                      playerName: player.username,
+                      coins: player.cashewCoins,
+                    ),
+                  ),
+                  const SizedBox(width: 20),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6.0),
+                    child: Image.asset('assets/images/Gear.png', width: 120),
+                  ),
                 ],
               ),
             ),
-          ),
-        ],
+            const Expanded(child: _MatchHistoryList()),
+            const _BottomNavBar(),
+          ],
+        ),
       ),
     );
   }
 }
 
+// O _TopBar também já estava ok.
 class _TopBar extends StatelessWidget {
   final String playerName;
   final int coins;
@@ -81,7 +98,7 @@ class _TopBar extends StatelessWidget {
         child: Container(
           height: 160,
           padding: const EdgeInsets.fromLTRB(50, 15, 60, 15),
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             image: DecorationImage(
               image: AssetImage('assets/images/userContainer.png'),
               fit: BoxFit.fill,
@@ -119,17 +136,16 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-/// **Lista rolável que contém os cards de histórico.**
+// _MatchHistoryList também estava ok.
 class _MatchHistoryList extends StatelessWidget {
+  const _MatchHistoryList({super.key});
+
   @override
   Widget build(BuildContext context) {
-    // Usamos o ListView.builder para criar uma lista rolável
     return ListView.builder(
-      // Remove o padding padrão do topo para não ter espaçamento extra
       padding: EdgeInsets.zero,
-      itemCount: 3, // Número de partidas para exibir (pode ser alterado)
+      itemCount: 3,
       itemBuilder: (context, index) {
-        // Dados estáticos de exemplo
         final List<Map<String, dynamic>> matchData = [
           {
             'opponent': 'OdiadorDoMiguel',
@@ -149,7 +165,6 @@ class _MatchHistoryList extends StatelessWidget {
         ];
 
         return Padding(
-          // Espaçamento entre os cards
           padding: const EdgeInsets.only(bottom: 16.0),
           child: _MatchHistoryCard(
             opponentName: matchData[index]['opponent'],
@@ -162,9 +177,8 @@ class _MatchHistoryList extends StatelessWidget {
   }
 }
 
-/// **Card individual que mostra o resultado de uma partida.**
-/// **Card individual que mostra o resultado de uma partida.**
-/// (WIDGET ATUALIZADO PARA CORRIGIR O LAYOUT)
+// --- WIDGET CORRIGIDO ---
+// AQUI ESTÁ A MUDANÇA PRINCIPAL
 class _MatchHistoryCard extends StatelessWidget {
   final String opponentName;
   final String result; // "Vitória" ou "Derrota"
@@ -178,86 +192,88 @@ class _MatchHistoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Define a cor do texto do resultado com base na vitória ou derrota
     final resultColor = (result == 'Vitória')
         ? const Color(0xFF27A844)
         : const Color(0xFFDC3545);
 
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        // Imagem de fundo do container
-        Image.asset('assets/images/historyContainer.png'),
-
-        // Conteúdo do card
-        Padding(
-          // Aumentamos o padding para dar mais respiro aos elementos
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    // Trocamos o Stack por um Container com DecorationImage
+    return Container(
+      // O padding agora é do próprio container, alinhando o conteúdo interno
+      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+      decoration: const BoxDecoration(
+        image: DecorationImage(
+          image: AssetImage('assets/images/historyContainer.png'),
+          // BoxFit.fill estica a imagem para preencher o container.
+          // Se a imagem estiver distorcendo, talvez precise ajustar a altura
+          // do container ou usar outro BoxFit.
+          fit: BoxFit.fill,
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Coluna da Esquerda (Oponente e Cartas)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center, // Centraliza verticalmente
             children: [
-              // Coluna da Esquerda (Oponente e Cartas)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    opponentName,
-                    style: const TextStyle(
-                      fontFamily: 'VT323',
-                      fontSize: 24,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  // Row para as imagens das cartas
-                  Row(
-                    children: List.generate(
-                      5,
-                      (index) => Padding(
-                        padding: const EdgeInsets.only(right: 8.0),
-                        child: Image.asset(
-                          'assets/images/cardPlutonio.png',
-                          width: 45,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+              Text(
+                opponentName,
+                style: const TextStyle(
+                  fontFamily: 'VT323',
+                  fontSize: 24,
+                  color: Colors.white,
+                ),
               ),
-
-              // Coluna da Direita (Resultado e Data)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    result,
-                    style: TextStyle(
-                      fontFamily: 'VT323',
-                      fontSize: 28,
-                      color: resultColor,
-                      fontWeight: FontWeight.bold,
+              const SizedBox(height: 8),
+              Row(
+                children: List.generate(
+                  5,
+                  (index) => Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: Image.asset(
+                      'assets/images/cardPlutonio.png',
+                      width: 45,
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    date,
-                    style: const TextStyle(
-                      fontFamily: 'VT323',
-                      fontSize: 22,
-                      color: Colors.white70,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ],
           ),
-        ),
-      ],
+
+          // Coluna da Direita (Resultado e Data)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisAlignment: MainAxisAlignment.center, // Centraliza verticalmente
+            children: [
+              Text(
+                result,
+                style: TextStyle(
+                  fontFamily: 'VT323',
+                  fontSize: 28,
+                  color: resultColor,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                date,
+                style: const TextStyle(
+                  fontFamily: 'VT323',
+                  fontSize: 22,
+                  color: Colors.white70,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
 
-/// **Barra de Navegação Inferior.**
+
+// O _BottomNavBar já estava ok
 class _BottomNavBar extends StatelessWidget {
   const _BottomNavBar();
 
@@ -301,8 +317,8 @@ class _BottomNavBar extends StatelessWidget {
           _NavItem(
             iconPath: 'assets/images/matchIcon.png',
             label: 'Partidas',
-            isSelected: true, // Item atual selecionado
-            onTap: () {}, // Não faz nada, pois já estamos nesta tela
+            isSelected: true,
+            onTap: () {},
           ),
         ],
       ),
@@ -310,7 +326,6 @@ class _BottomNavBar extends StatelessWidget {
   }
 }
 
-/// **Widget para um item da barra de navegação.**
 class _NavItem extends StatelessWidget {
   final String iconPath;
   final String label;
@@ -326,9 +341,8 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isSelected
-        ? const Color(0xFFF98B25)
-        : const Color(0xFF8B5E3C);
+    final color =
+        isSelected ? const Color(0xFFF98B25) : const Color(0xFF8B5E3C);
     return GestureDetector(
       onTap: onTap,
       child: Column(
