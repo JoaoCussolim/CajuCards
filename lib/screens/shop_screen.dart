@@ -24,9 +24,13 @@ class _ShopScreenState extends State<ShopScreen> {
         fit: StackFit.expand,
         children: [
           Image.asset('assets/images/WoodBasic.png', fit: BoxFit.cover),
+          _buildMainContent(),
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24.0, horizontal: 24.0),
+              padding: const EdgeInsets.symmetric(
+                vertical: 24.0,
+                horizontal: 24.0,
+              ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -42,18 +46,66 @@ class _ShopScreenState extends State<ShopScreen> {
                       const SizedBox(width: 20),
                       Padding(
                         padding: const EdgeInsets.only(bottom: 6.0),
-                        child: Image.asset('assets/images/Gear.png', width: 120),
+                        child: Image.asset(
+                          'assets/images/Gear.png',
+                          width: 120,
+                        ),
                       ),
                     ],
                   ),
-                  const Flexible(
-                    child: Center(
-                      child: _ChestSelection(),
-                    ),
-                  ),
+                  const Flexible(child: Center(child: _ChestSelection())),
                   const _BottomNavBar(),
                 ],
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMainContent() {
+    const double tamanhoCastanha = 240.0;
+    return SafeArea(
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned(
+            top: 140,
+            left: 40,
+            child: Image.asset(
+              'assets/images/Castanha1Cima.png',
+              width: tamanhoCastanha,
+            ),
+          ),
+          Positioned(
+            top: 140,
+            right: 40,
+            child: Image.asset(
+              'assets/images/Castanha2Cima.png',
+              width: tamanhoCastanha,
+            ),
+          ),
+          Positioned(
+            bottom: 120,
+            left: 40,
+            child: Image.asset(
+              'assets/images/Castanha1Baixo.png',
+              width: tamanhoCastanha,
+            ),
+          ),
+          Positioned(
+            bottom: 120,
+            right: 40,
+            child: Image.asset(
+              'assets/images/Castanha2Baixo.png',
+              width: tamanhoCastanha,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              vertical: 24.0,
+              horizontal: 24.0,
             ),
           ),
         ],
@@ -115,7 +167,6 @@ class _TopBar extends StatelessWidget {
     );
   }
 }
-
 
 // --- WIDGETS INALTERADOS (JÁ ESTAVAM CORRETOS) ---
 
@@ -181,7 +232,12 @@ class _ChestCard extends StatelessWidget {
           const SizedBox(height: 20),
           Text(
             name,
-            style: const TextStyle(fontFamily: 'VT323', fontSize: 30, color: Colors.white, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              fontFamily: 'VT323',
+              fontSize: 30,
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 8),
           Row(
@@ -189,10 +245,17 @@ class _ChestCard extends StatelessWidget {
             children: [
               Text(
                 price.toString(),
-                style: const TextStyle(fontFamily: 'VT323', fontSize: 26, color: Colors.white),
+                style: const TextStyle(
+                  fontFamily: 'VT323',
+                  fontSize: 26,
+                  color: Colors.white,
+                ),
               ),
               const SizedBox(width: 8),
-              Image.asset('assets/images/cajucoin.png', width: 26),
+              Padding(
+                padding: const EdgeInsets.only(top: 9.0),
+                child: Image.asset('assets/images/cajucoin.png', width: 50),
+              ),
             ],
           ),
         ],
@@ -260,7 +323,9 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isSelected ? const Color(0xFFF98B25) : const Color(0xFF8B5E3C);
+    final color = isSelected
+        ? const Color(0xFFF98B25)
+        : const Color(0xFF8B5E3C);
     return GestureDetector(
       onTap: onTap,
       child: Column(
@@ -271,7 +336,7 @@ class _NavItem extends StatelessWidget {
           Text(
             label,
             style: TextStyle(fontFamily: 'VT323', fontSize: 18, color: color),
-          )
+          ),
         ],
       ),
     );
