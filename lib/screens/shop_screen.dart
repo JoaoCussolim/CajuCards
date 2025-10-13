@@ -39,10 +39,10 @@ class _ShopScreenState extends State<ShopScreen> {
                           coins: _playerCoins,
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 20),
                       Padding(
                         padding: const EdgeInsets.only(bottom: 6.0),
-                        child: Image.asset('assets/images/Gear.png', width: 45),
+                        child: Image.asset('assets/images/Gear.png', width: 120),
                       ),
                     ],
                   ),
@@ -64,7 +64,6 @@ class _ShopScreenState extends State<ShopScreen> {
 
 // --- WIDGET ATUALIZADO ---
 
-/// **Barra Superior com espaçamento interno e alinhamento corrigidos.**
 class _TopBar extends StatelessWidget {
   final String playerName;
   final int coins;
@@ -73,35 +72,46 @@ class _TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        // Camada 1: A imagem de fundo.
-        Image.asset('assets/images/userContainer.png'),
-
-        // Camada 2: O conteúdo sobreposto com padding generoso.
-        Padding(
-          // **CORREÇÃO:** Padding horizontal aumentado para centralizar o texto
-          // e um padding vertical para o ajuste fino do alinhamento.
-          padding: const EdgeInsets.fromLTRB(50.0, 4.0, 50.0, 0),
+    return Center(
+      child: SizedBox(
+        width: MediaQuery.of(context).size.width * 0.85,
+        child: Container(
+          height: 160,
+          padding: const EdgeInsets.fromLTRB(50, 15, 60, 15),
+          decoration: BoxDecoration(
+            image: DecorationImage(
+              image: AssetImage('assets/images/userContainer.png'),
+              fit: BoxFit.fill,
+            ),
+          ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Text(
                 playerName,
-                style: const TextStyle(fontFamily: 'VT323', fontSize: 32, color: Color(0xFF4B2D18)),
+                style: const TextStyle(
+                  fontFamily: 'VT323',
+                  fontSize: 64,
+                  color: Color(0xFF4B2D18),
+                ),
               ),
               const Spacer(),
-              Image.asset('assets/images/cajucoin.png', width: 28),
-              const SizedBox(width: 10),
+              Padding(
+                padding: const EdgeInsets.only(top: 15.0),
+                child: Image.asset('assets/images/cajucoin.png', width: 110),
+              ),
+              const SizedBox(width: 15),
               Text(
                 coins.toString(),
-                style: const TextStyle(fontFamily: 'VT323', fontSize: 32, color: Color(0xFF4B2D18)),
+                style: const TextStyle(
+                  fontFamily: 'VT323',
+                  fontSize: 64,
+                  color: Color(0xFF4B2D18),
+                ),
               ),
             ],
           ),
         ),
-      ],
+      ),
     );
   }
 }

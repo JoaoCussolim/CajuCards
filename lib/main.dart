@@ -1,8 +1,10 @@
+import 'package:cajucards/screens/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:cajucards/screens/register_screen.dart';
 import 'package:cajucards/screens/initial_screen.dart';
 import 'package:cajucards/screens/history_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:cajucards/screens/matchmaking_screen.dart';
 
 
 class MyApp extends StatelessWidget {
@@ -12,7 +14,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return const MaterialApp(
       title: 'CajuCards',
-      home: HistoryScreen(),
+      home: LoginScreen(),
       debugShowCheckedModeBanner: false,
     );
   }

@@ -40,19 +40,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             coins: _playerCoins,
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 20),
                         Padding(
                           padding: const EdgeInsets.only(bottom: 6.0),
-                          child: Image.asset('assets/images/Gear.png', width: 45),
+                          child: Image.asset(
+                            'assets/images/Gear.png',
+                            width: 120,
+                          ),
                         ),
                       ],
                     ),
                   ),
 
                   // 3. Conteúdo Central (Lista de Partidas Rolável)
-                  Expanded(
-                    child: _MatchHistoryList(),
-                  ),
+                  Expanded(child: _MatchHistoryList()),
 
                   // 4. Barra de Navegação Inferior
                   const _BottomNavBar(),
@@ -66,7 +67,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 }
 
-/// **Barra Superior com informações do jogador.**
 class _TopBar extends StatelessWidget {
   final String playerName;
   final int coins;
@@ -75,29 +75,46 @@ class _TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        Image.asset('assets/images/userContainer.png'),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(25.0, 4.0, 20.0, 0),
+    return Center(
+      child: SizedBox(
+        width: MediaQuery.of(context).size.width * 0.85,
+        child: Container(
+          height: 160,
+          padding: const EdgeInsets.fromLTRB(50, 15, 60, 15),
+          decoration: BoxDecoration(
+            image: DecorationImage(
+              image: AssetImage('assets/images/userContainer.png'),
+              fit: BoxFit.fill,
+            ),
+          ),
           child: Row(
             children: [
               Text(
                 playerName,
-                style: const TextStyle(fontFamily: 'VT323', fontSize: 32, color: Color(0xFF4B2D18)),
+                style: const TextStyle(
+                  fontFamily: 'VT323',
+                  fontSize: 64,
+                  color: Color(0xFF4B2D18),
+                ),
               ),
               const Spacer(),
-              Image.asset('assets/images/cajucoin.png', width: 28),
-              const SizedBox(width: 10),
+              Padding(
+                padding: const EdgeInsets.only(top: 15.0),
+                child: Image.asset('assets/images/cajucoin.png', width: 110),
+              ),
+              const SizedBox(width: 15),
               Text(
                 coins.toString(),
-                style: const TextStyle(fontFamily: 'VT323', fontSize: 32, color: Color(0xFF4B2D18)),
+                style: const TextStyle(
+                  fontFamily: 'VT323',
+                  fontSize: 64,
+                  color: Color(0xFF4B2D18),
+                ),
               ),
             ],
           ),
         ),
-      ],
+      ),
     );
   }
 }
@@ -117,18 +134,18 @@ class _MatchHistoryList extends StatelessWidget {
           {
             'opponent': 'OdiadorDoMiguel',
             'result': 'Derrota',
-            'date': '22/09/2025'
+            'date': '22/09/2025',
           },
           {
             'opponent': 'GostadorDoMiguel',
             'result': 'Vitória',
-            'date': '22/09/2025'
+            'date': '22/09/2025',
           },
           {
             'opponent': 'OfficialClashRoyale',
             'result': 'Vitória',
-            'date': '22/09/2025'
-          }
+            'date': '22/09/2025',
+          },
         ];
 
         return Padding(
@@ -162,7 +179,9 @@ class _MatchHistoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Define a cor do texto do resultado com base na vitória ou derrota
-    final resultColor = (result == 'Vitória') ? const Color(0xFF27A844) : const Color(0xFFDC3545);
+    final resultColor = (result == 'Vitória')
+        ? const Color(0xFF27A844)
+        : const Color(0xFFDC3545);
 
     return Stack(
       alignment: Alignment.center,
@@ -183,31 +202,50 @@ class _MatchHistoryCard extends StatelessWidget {
                 children: [
                   Text(
                     opponentName,
-                    style: const TextStyle(fontFamily: 'VT323', fontSize: 24, color: Colors.white),
+                    style: const TextStyle(
+                      fontFamily: 'VT323',
+                      fontSize: 24,
+                      color: Colors.white,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   // Row para as imagens das cartas
                   Row(
-                    children: List.generate(5, (index) => Padding(
-                      padding: const EdgeInsets.only(right: 8.0),
-                      child: Image.asset('assets/images/cardPlutonio.png', width: 45),
-                    )),
+                    children: List.generate(
+                      5,
+                      (index) => Padding(
+                        padding: const EdgeInsets.only(right: 8.0),
+                        child: Image.asset(
+                          'assets/images/cardPlutonio.png',
+                          width: 45,
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
-              
+
               // Coluna da Direita (Resultado e Data)
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
                     result,
-                    style: TextStyle(fontFamily: 'VT323', fontSize: 28, color: resultColor, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontFamily: 'VT323',
+                      fontSize: 28,
+                      color: resultColor,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Text(
                     date,
-                    style: const TextStyle(fontFamily: 'VT323', fontSize: 22, color: Colors.white70),
+                    style: const TextStyle(
+                      fontFamily: 'VT323',
+                      fontSize: 22,
+                      color: Colors.white70,
+                    ),
                   ),
                 ],
               ),
@@ -288,7 +326,9 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isSelected ? const Color(0xFFF98B25) : const Color(0xFF8B5E3C);
+    final color = isSelected
+        ? const Color(0xFFF98B25)
+        : const Color(0xFF8B5E3C);
     return GestureDetector(
       onTap: onTap,
       child: Column(
@@ -299,7 +339,7 @@ class _NavItem extends StatelessWidget {
           Text(
             label,
             style: TextStyle(fontFamily: 'VT323', fontSize: 18, color: color),
-          )
+          ),
         ],
       ),
     );

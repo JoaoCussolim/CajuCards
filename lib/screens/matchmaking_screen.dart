@@ -3,7 +3,7 @@ import 'dart:async';
 import 'dart:math';
 
 // TODO: Se a tela de batalha for o próximo passo, importe-a.
-// import 'package:cajucards/screens/battle_screen.dart'; 
+// import 'package:cajucards/screens/battle_screen.dart';
 
 class MatchmakingScreen extends StatefulWidget {
   const MatchmakingScreen({super.key});
@@ -14,7 +14,6 @@ class MatchmakingScreen extends StatefulWidget {
 
 class _MatchmakingScreenState extends State<MatchmakingScreen>
     with SingleTickerProviderStateMixin {
-  
   // --- Animação do Caju ---
   late AnimationController _pulsarController;
   late Animation<double> _pulsarAnimation;
@@ -61,7 +60,7 @@ class _MatchmakingScreenState extends State<MatchmakingScreen>
         });
       }
     });
-    
+
     _currentPhraseIndex = Random().nextInt(_phrases.length);
 
     _phrasesTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
@@ -94,31 +93,34 @@ class _MatchmakingScreenState extends State<MatchmakingScreen>
 
   @override
   Widget build(BuildContext context) {
-    const double tamanhoCastanha = 150.0; 
+    const double tamanhoCastanha = 150.0;
 
     return Scaffold(
       body: Stack(
         fit: StackFit.expand,
         children: [
           // Imagem de fundo
-          Image.asset(
-            'assets/images/WoodBasic.png',
-            fit: BoxFit.cover,
-          ),
-
-          // --- AJUSTE FEITO AQUI ---
+          Image.asset('assets/images/WoodBasic.png', fit: BoxFit.cover),
 
           // 1. Logo posicionada no topo
-          Positioned(
-            top: MediaQuery.of(context).size.height * 0.001,
-            left: 0,
-            right: 0,
-            child: Image.asset(
-              'assets/images/Logo.png',
-              width: MediaQuery.of(context).size.width * 0.3,
+          SafeArea(
+            // SafeArea evita que a logo cole na barra de status do celular
+            child: Align(
+              alignment: Alignment.topCenter, // Alinha no centro do topo
+              child: Padding(
+                padding: EdgeInsets.only(
+                  top: 10.0,
+                ), // Ajuste esse valor para descer mais ou menos
+                child: Image.asset(
+                  'assets/images/Logo.png',
+                  width:
+                      MediaQuery.of(context).size.width *
+                      0.6, // Aumentei um pouco pra dar mais destaque, ajuste como preferir
+                ),
+              ),
             ),
           ),
-          
+
           // 2. Caju e texto centralizados (sem a logo)
           Center(
             child: Column(
@@ -173,8 +175,8 @@ class _MatchmakingScreenState extends State<MatchmakingScreen>
                       _phrases[_currentPhraseIndex],
                       textAlign: TextAlign.center,
                       style: const TextStyle(
-                        fontFamily: 'VT333',
-                        fontSize: 28,
+                        fontFamily: 'VT323',
+                        fontSize: 36,
                         color: Color(0xFFDD7326),
                         height: 1.2,
                       ),
@@ -184,7 +186,7 @@ class _MatchmakingScreenState extends State<MatchmakingScreen>
               ),
             ),
           ),
-          
+
           // Castanhas nos cantos
           Positioned(
             top: 10,
