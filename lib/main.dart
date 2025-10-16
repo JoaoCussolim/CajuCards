@@ -1,8 +1,11 @@
+import 'package:cajucards/screens/initial_screen.dart';
 import 'package:cajucards/screens/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cajucards/providers/player_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:cajucards/screens/victory_screen.dart';
+import 'package:cajucards/screens/defeat_screen.dart';
 import 'package:cajucards/screens/playground.dart';
 
 void main() async {
