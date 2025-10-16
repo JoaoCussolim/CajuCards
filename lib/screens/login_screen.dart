@@ -1,3 +1,4 @@
+import 'package:cajucards/screens/playground.dart';
 import 'package:flutter/material.dart';
 import 'package:cajucards/api/services/auth_service.dart';
 import 'initial_screen.dart';
@@ -84,7 +85,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (success) {
         _showSuccessToast('Login efetuado! Bem-vindo(a) de volta.');
         Navigator.of(currentContext).pushReplacement(
-          MaterialPageRoute(builder: (_) => const InitialScreen()),
+          MaterialPageRoute(builder: (_) => const PlaygroundScreen()),
         );
       } else {
         setState(() => _isLoading = false);

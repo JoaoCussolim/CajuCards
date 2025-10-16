@@ -177,7 +177,6 @@ class _MatchHistoryList extends StatelessWidget {
   }
 }
 
-// AQUI ESTÁ A MUDANÇA PRINCIPAL
 class _MatchHistoryCard extends StatelessWidget {
   final String opponentName;
   final String result; // "Vitória" ou "Derrota"
