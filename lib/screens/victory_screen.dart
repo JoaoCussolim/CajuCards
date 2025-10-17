@@ -1,8 +1,35 @@
-import 'package:cajucards/screens/battle_screen.dart'; // Ou a tela para onde você quer ir
+import 'package:cajucards/screens/battle_screen.dart';
 import 'package:flutter/material.dart';
+import 'dart:math'; // Usaremos sin e pi para a animação de onda
 
-class VictoryScreen extends StatelessWidget {
+class VictoryScreen extends StatefulWidget {
   const VictoryScreen({super.key});
+
+  @override
+  State<VictoryScreen> createState() => _VictoryScreenState();
+}
+
+class _VictoryScreenState extends State<VictoryScreen>
+    with SingleTickerProviderStateMixin {
+  // Agora precisamos apenas de UM controller
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // O controller agora simplesmente repete de 0.0 a 1.0
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500), // Um pouco mais lento
+    )..repeat(); // Sem 'reverse'
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -10,19 +37,15 @@ class VictoryScreen extends StatelessWidget {
       body: Stack(
         fit: StackFit.expand,
         children: [
-         
           Image.asset('assets/images/WoodBasic.png', fit: BoxFit.cover),
-
           Positioned(
             bottom: 120,
             left: 100,
             child: Transform.rotate(
-              angle: 0.2, 
+              angle: 0.2,
               child: Image.asset('assets/images/folha.png', width: 120),
             ),
           ),
-
-          
           Positioned(
             bottom: 70,
             left: 170,
@@ -31,8 +54,6 @@ class VictoryScreen extends StatelessWidget {
               child: Image.asset('assets/images/folha.png', width: 100),
             ),
           ),
-
-          
           Positioned(
             top: 0,
             right: 150,
@@ -41,8 +62,6 @@ class VictoryScreen extends StatelessWidget {
               child: Image.asset('assets/images/folha.png', width: 125),
             ),
           ),
-
-          
           Positioned(
             top: 90,
             right: 120,
@@ -51,26 +70,55 @@ class VictoryScreen extends StatelessWidget {
               child: Image.asset('assets/images/folha.png', width: 105),
             ),
           ),
-
           Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                
-                Image.asset(
-                  'assets/images/starBanner.png',
-                  width: 600, 
+                SizedBox(
+                  width: 600,
+                  height: 200,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Image.asset('assets/images/banner.png', width: 600),
+
+                      // ORDEM DA ANIMAÇÃO INVERTIDA
+                      Positioned(
+                        top: 55,
+                        left: 110,
+                        child: _buildAnimatedStar(
+                          _controller,
+                          120,
+                          0.3,
+                        ), // Começa por último
+                      ),
+                      Positioned(
+                        top: 0,
+                        left: 230,
+                        child: _buildAnimatedStar(
+                          _controller,
+                          150,
+                          0.15,
+                        ), // Continua no meio
+                      ),
+                      Positioned(
+                        top: 55,
+                        right: 110,
+                        child: _buildAnimatedStar(
+                          _controller,
+                          110,
+                          0.0,
+                        ), // Começa primeiro
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 0), 
-                
                 Image.asset(
                   'assets/images/victory.png',
-                  height: 300,
-                  width: 600,
+                  height: 150,
+                  width: 500,
                 ),
-                const SizedBox(
-                  height: 0,
-                ), 
+                const SizedBox(height: 100),
                 Container(
                   width: 600,
                   height: 150,
@@ -89,7 +137,7 @@ class VictoryScreen extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          SizedBox(width: 20),
+                          const SizedBox(width: 20),
                           Image.asset(
                             'assets/images/cajucoin2.png',
                             width: 100,
@@ -97,8 +145,8 @@ class VictoryScreen extends StatelessWidget {
                           ),
                           const SizedBox(width: 10),
                           _buildStrokedText(
-                            '+1000', 
-                            60, 
+                            '+1000',
+                            60,
                             Colors.white,
                             2.0,
                             const Color(0xFF4B2D18),
@@ -120,7 +168,28 @@ class VictoryScreen extends StatelessWidget {
     );
   }
 
- 
+  // Widget da estrela foi modificado para receber o atraso (phaseDelay)
+  Widget _buildAnimatedStar(
+    Animation<double> controller,
+    double size,
+    double phaseDelay,
+  ) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, child) {
+        // A matemática da onda acontece aqui!
+        final time = (controller.value + phaseDelay) % 1.0;
+        final yOffset =
+            sin(time * 2 * pi) *
+            7.5; // Multiplica por 2*pi para um ciclo completo
+
+        return Transform.translate(offset: Offset(0, yOffset), child: child);
+      },
+      child: Image.asset('assets/images/star.png', width: size),
+    );
+  }
+
+  // O resto do seu código permanece o mesmo
   Widget _buildStrokedText(
     String text,
     double fontSize,
@@ -154,7 +223,6 @@ class VictoryScreen extends StatelessWidget {
       ],
     );
   }
-
 
   Widget _buildExitButton(BuildContext context) {
     return GestureDetector(

@@ -32,7 +32,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return const MaterialApp(
       title: 'CajuCards',
-      home: LoginScreen(),
+      home: VictoryScreen(),
       debugShowCheckedModeBanner: false,
     );
   }
