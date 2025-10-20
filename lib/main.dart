@@ -8,9 +8,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:cajucards/screens/victory_screen.dart';
 import 'package:cajucards/screens/defeat_screen.dart';
 import 'package:cajucards/screens/playground.dart';
+import 'package:flame/flame.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  Flame.images.prefix = '';
 
   await Supabase.initialize(
     url: 'https://gvlcgmozoqjkcexcchrn.supabase.co',

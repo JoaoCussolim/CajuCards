@@ -2,13 +2,12 @@ import 'package:cajucards/api/api_client.dart';
 import 'package:cajucards/api/services/card_service.dart';
 import 'package:cajucards/api/services/socket_service.dart';
 import 'package:cajucards/components/card_sprite.dart';
-import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:cajucards/models/card.dart' as card_model;
 
-class CajuPlaygroundGame extends FlameGame with TapCallbacks  {
+class CajuPlaygroundGame extends FlameGame with TapCallbacks {
   final SocketService socketService;
   CajuPlaygroundGame({required this.socketService});
 
@@ -22,7 +21,14 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks  {
     final cardService = CardService(ApiClient());
 
     try {
+      print("Buscando cartas..."); // DEBUG
       final List<card_model.Card> allCards = await cardService.getAllCards();
+      print("Recebidas ${allCards.length} cartas."); // DEBUG
+
+      if (allCards.isEmpty) {
+        print("Nenhuma carta encontrada na API."); // DEBUG
+        return;
+      }
 
       double xPos = 50.0;
       double yPos = 50.0;
@@ -36,22 +42,16 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks  {
         )..position = Vector2(xPos, yPos);
 
         add(cardSprite);
-
-        xPos += xGap;
-        if (xPos > size.x - 100) {
-          xPos = 50.0;
-          yPos += yGap;
-        }
       }
     } catch (e, stackTrace) {
-      print("--- ERRO AO CARREGAR CARTAS DA API ---"); 
+      print("--- ERRO AO CARREGAR CARTAS DA API ---");
       print(e);
       print(stackTrace);
     }
   }
 }
 
-// Passo 2: O Widget que exibe o jogo na tela
+// O resto do seu arquivo (Widget)
 class PlaygroundScreen extends StatefulWidget {
   const PlaygroundScreen({super.key});
 

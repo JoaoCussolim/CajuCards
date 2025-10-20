@@ -82,13 +82,18 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       final success = await playerProvider.fetchAndSetPlayer();
 
+      // Verifique se o widget ainda está montado DEPOIS do await
+      if (!mounted) return; // Use 'mounted' diretamente (disponível em State)
+
       if (success) {
         _showSuccessToast('Login efetuado! Bem-vindo(a) de volta.');
-        Navigator.of(currentContext).pushReplacement(
+        // Use o 'context' atual que você sabe que é válido porque 'mounted' é true
+        Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const PlaygroundScreen()),
         );
       } else {
-        setState(() => _isLoading = false);
+        // Se já estava aqui, não precisa mais do setState para isLoading
+        // setState(() => _isLoading = false); // Pode remover se já fez antes
         _showErrorToast(
           playerProvider.error ?? 'Não foi possível carregar seus dados.',
         );

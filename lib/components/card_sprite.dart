@@ -19,20 +19,12 @@ class CardSprite extends PositionComponent with TapCallbacks {
   Future<void> onLoad() async {
     super.onLoad();
 
-    // --- CAMINHOS DOS ASSETS ---
-    // Estrutura de pastas que vimos na imagem
-    final backgroundPath = 'sprites/background/${card.synergy}.png';
-    final borderPath = 'sprites/border/${card.rarity}.png';
-    final characterPath = 'sprites/${card.spritePath}';
+    final backgroundPath = 'images/sprites/background/${card.synergy}.png';
+    final borderPath = 'images/sprites/border/${card.rarity}.png';
+    final characterPath = 'images/sprites/${card.spritePath}';
 
     final synergyBackground = SpriteComponent(
       sprite: await Sprite.load(backgroundPath),
-      size: size,
-    );
-
-    // 2. Carrega a imagem base da carta (a que você mandou)
-    final cardBase = SpriteComponent(
-      sprite: await Sprite.load('card_base.png'), // << NOME DO SEU ARQUIVO
       size: size,
     );
 
@@ -67,14 +59,12 @@ class CardSprite extends PositionComponent with TapCallbacks {
       textRenderer: textStyle,
       anchor: Anchor.center,
       position: Vector2(
-        size.x * 0.22,
-        size.y * 0.15,
+        size.x * 0.26,
+        size.y * 0.23,
       ), // Posição na "tag" laranja
     );
 
-    // Adiciona os componentes na ordem de pintura (de baixo para cima)
     add(synergyBackground);
-    add(cardBase);
     add(characterSprite);
     add(rarityBorder);
     add(costText); // O custo fica por cima de tudo

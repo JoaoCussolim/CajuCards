@@ -64,9 +64,6 @@ flutter:
 
   assets:
     - assets/images/
-    - assets/sprites/background/ 
-    - assets/sprites/border/     
-    - assets/sprites/ 
 
   fonts:
     - family: VT323
