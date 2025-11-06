@@ -85,12 +85,25 @@ class SocketService with ChangeNotifier {
     });
 
     // Evento principal: Partida encontrada!
+// DENTRO DE connectAndListen() EM socket_service.dart
+
     _socket!.on('matchFound', (data) {
-      debugPrint('Partida Encontrada!');
-      _gameState = GameState.fromJson(data);
-      _status = MatchmakingStatus.inMatch;
-      _errorMessage = null;
-      notifyListeners();
+      debugPrint("SocketService: MatchFound! Data RAW: $data");
+
+      final gameStateMap = data as Map<String, dynamic>;
+
+      try {
+        _gameState = GameState.fromJson(gameStateMap);
+        _status = MatchmakingStatus.inMatch;
+        notifyListeners();
+        debugPrint("SocketService: GameState pareado com sucesso. Status: $_status");
+      } catch (e) {
+        debugPrint("SocketService: Erro ao parear GameState.fromJson: $e");
+        // Lidar com o erro, talvez voltando ao status 'idle'
+        _status = MatchmakingStatus.error;
+        _errorMessage = "Erro ao carregar dados da partida.";
+        notifyListeners();
+      }
     });
 
     // Evento principal: O estado do jogo foi atualizado
