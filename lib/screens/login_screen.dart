@@ -85,11 +85,8 @@ class _LoginScreenState extends State<LoginScreen> {
       if (success) {
         _showSuccessToast('Login efetuado! Bem-vindo(a) de volta.');
 
-        // --- INÍCIO DA ALTERAÇÃO PRINCIPAL ---
         bool socketConnected = false;
         try {
-          // 1. ADICIONADO 'await': Agora esperamos a função terminar.
-          // 2. ADICIONADO 'socketConnected': Salvamos o resultado (true/false)
           socketConnected =
               await context.read<SocketService>().connectAndListen();
         } catch (e) {
@@ -98,9 +95,6 @@ class _LoginScreenState extends State<LoginScreen> {
         }
 
         if (!mounted) return;
-
-        // 3. ADICIONADO 'if/else': Só navegamos se a conexão do socket
-        //    foi bem-sucedida (retornou true).
         if (socketConnected) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (_) => const InitialScreen()),
@@ -290,7 +284,7 @@ class _LoginScreenState extends State<LoginScreen> {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: fontSize,
-              fontFamily: 'VT3323',
+              fontFamily: 'VT323',
               fontWeight: FontWeight.w600,
               foreground: Paint()
                 ..style = PaintingStyle.stroke
@@ -305,7 +299,7 @@ class _LoginScreenState extends State<LoginScreen> {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: fontSize,
-              fontFamily: 'VT3323',
+              fontFamily: 'VT323',
               fontWeight: FontWeight.w600,
               color: fillColor,
             ),

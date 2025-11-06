@@ -3,7 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cajucards/providers/player_provider.dart';
 import 'package:cajucards/models/player.dart';
-import 'battle_screen.dart'; 
+import 'battle_screen.dart';
+
+// 1. NOVOS IMPORTS ADICIONADOS
+import 'package:cajucards/models/emote.dart';
+import 'package:cajucards/screens/opening_chest_screen.dart';
+// FIM DOS NOVOS IMPORTS
 
 class ShopScreen extends StatelessWidget {
   const ShopScreen({super.key});
@@ -28,7 +33,7 @@ class ShopScreen extends StatelessWidget {
                     playerProvider.error!,
                     style: const TextStyle(
                       color: Colors.white,
-                      fontFamily: 'VT323',
+                      fontFamily: 'VT33',
                       fontSize: 24,
                     ),
                   ),
@@ -43,6 +48,31 @@ class ShopScreen extends StatelessWidget {
                     style: TextStyle(color: Colors.white),
                   ),
                 ),
+              
+              // 2. ADICIONADO: Lógica de loading (como na login_screen)
+              // Essencial para feedback e para evitar múltiplos cliques.
+              if (playerProvider.isBuyingChest)
+                Container(
+                  color: Colors.black.withOpacity(0.6),
+                  child: const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(color: Colors.white),
+                        SizedBox(height: 20),
+                        Text(
+                          'Processando compra...',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontFamily: 'VT323',
+                            fontSize: 24,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              // FIM DA ADIÇÃO
             ],
           ),
         );
@@ -50,7 +80,7 @@ class ShopScreen extends StatelessWidget {
     );
   }
 
-  // Novo método que recebe o Player para construir a UI
+  // NENHUMA ALTERAÇÃO NESTE MÉTODO
   Widget _buildScreenContent(BuildContext context, Player player) {
     return SafeArea(
       child: Padding(
@@ -84,6 +114,7 @@ class ShopScreen extends StatelessWidget {
   }
 }
 
+// NENHUMA ALTERAÇÃO NESTE WIDGET
 class _TopBar extends StatelessWidget {
   final String playerName;
   final int coins;
@@ -136,8 +167,7 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-// --- WIDGETS INALTERADOS (JÁ ESTAVAM CORRETOS) ---
-
+// NENHUMA ALTERAÇÃO NESTE WIDGET
 class _ChestSelection extends StatelessWidget {
   const _ChestSelection();
 
@@ -170,6 +200,7 @@ class _ChestSelection extends StatelessWidget {
   }
 }
 
+// 3. ALTERAÇÕES LÓGICAS NESTE WIDGET
 class _ChestCard extends StatelessWidget {
   final String backgroundPath;
   final String imagePath;
@@ -183,10 +214,85 @@ class _ChestCard extends StatelessWidget {
     required this.price,
   });
 
+  // 4. ADICIONADO: Método de "toast" de erro (copiado da login_screen)
+  void _showErrorToast(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        content: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFF8C1C13), // Cor vermelha do erro
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFF5A0000), width: 3),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.error_outline, // Ícone de erro
+                color: Colors.white,
+                size: 32,
+              ),
+              const SizedBox(width: 15),
+              Expanded(
+                child: Text(
+                  message,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontFamily: 'VT323',
+                    fontSize: 20,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 5. ADICIONADO: Lógica de compra
+  void _handleBuyChest(BuildContext context) async {
+    final provider = context.read<PlayerProvider>();
+
+    // Proteção contra múltiplos cliques
+    if (provider.isBuyingChest) return;
+
+    provider.clearBuyChestError();
+
+    // Chama a API
+    final bool success = await provider.buyChest(name, price);
+
+    // Verifica se o widget ainda está montado
+    if (!context.mounted) return;
+
+    if (success) {
+      // SUCESSO: Navega para a tela de abertura
+      final Emote? wonEmote = provider.lastWonEmote;
+      if (wonEmote != null) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => OpeningChestScreen(
+              chestImagePath: imagePath,
+              wonEmote: wonEmote,
+            ),
+          ),
+        );
+      }
+    } else {
+      // FALHA: Mostra o "toast" de erro, como na login_screen
+      final String error = provider.buyChestError ?? "Ocorreu um erro.";
+      _showErrorToast(context, error);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => print("Navegar para a tela de abrir o $name"),
+      // 6. ALTERADO: O onTap agora chama a lógica
+      onTap: () => _handleBuyChest(context),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -232,6 +338,7 @@ class _ChestCard extends StatelessWidget {
   }
 }
 
+// NENHUMA ALTERAÇÃO NESTE WIDGET
 class _BottomNavBar extends StatelessWidget {
   const _BottomNavBar();
 
@@ -282,6 +389,7 @@ class _BottomNavBar extends StatelessWidget {
   }
 }
 
+// NENHUMA ALTERAÇÃO NESTE WIDGET
 class _NavItem extends StatelessWidget {
   final String iconPath;
   final String label;
