@@ -9,6 +9,7 @@ import 'package:cajucards/screens/victory_screen.dart';
 import 'package:cajucards/screens/defeat_screen.dart';
 import 'package:cajucards/screens/playground.dart';
 import 'package:flame/flame.dart';
+import 'package:cajucards/api/services/socket_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,9 +22,11 @@ void main() async {
   );
 
   runApp(
-    // Envolve o MyApp com o ChangeNotifierProvider
-    ChangeNotifierProvider(
-      create: (context) => PlayerProvider(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (context) => PlayerProvider()),
+        ChangeNotifierProvider(create: (context) => SocketService()),
+      ],
       child: const MyApp(),
     ),
   );

@@ -6,6 +6,11 @@ import 'package:cajucards/models/player.dart';
 import 'shop_screen.dart';
 import 'history_screen.dart';
 
+// --- ADICIONADO ---
+// Importe o SocketService para que possamos chamá-lo
+import 'package:cajucards/api/services/socket_service.dart';
+// --- FIM DA ADIÇÃO ---
+
 class BattleScreen extends StatelessWidget {
   const BattleScreen({super.key});
 
@@ -184,7 +189,17 @@ class _StartButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      // --- INÍCIO DA ALTERAÇÃO LÓGICA ---
       onTap: () {
+        // 1. Pega o SocketService (sem escutar)
+        final socketService = context.read<SocketService>();
+
+        // 2. Inicia a busca pela partida
+        socketService.findMatch();
+        debugPrint(
+            "BattleScreen: Chamando findMatch() e navegando para Matchmaking...");
+
+        // 3. Navega para a tela de Matchmaking (como você já fazia)
         Navigator.pushReplacement(
           context,
           PageRouteBuilder(
@@ -194,6 +209,7 @@ class _StartButton extends StatelessWidget {
           ),
         );
       },
+      // --- FIM DA ALTERAÇÃO LÓGICA ---
       child: Stack(
         alignment: Alignment.center,
         children: [Image.asset('assets/images/buttonBattle.png', width: 600)],

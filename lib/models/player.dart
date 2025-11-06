@@ -10,10 +10,19 @@ class Player {
   });
 
   factory Player.fromJson(Map<String, dynamic> json) {
+    int coins = 0;
+    final coinsValue = json['cashew_coins'];
+
+    if (coinsValue is int) {
+      coins = coinsValue;
+    } else if (coinsValue is String) {
+      coins = int.tryParse(coinsValue) ?? 0; 
+    }
+    
     return Player(
       id: json['id'],
       username: json['username'],
-      cashewCoins: json['cashew_coins'],
+      cashewCoins: coins,
     );
   }
 }

@@ -19,80 +19,87 @@ class SocketService with ChangeNotifier {
   String? get errorMessage => _errorMessage;
 
   // --- 1. Conexão e Configuração dos Listeners ---
-  void connectAndListen() {
-    // Pega o token de acesso do Supabase para autenticação
-    final String? accessToken =
-        Supabase.instance.client.auth.currentSession?.accessToken;
+
+  // --- ALTERAÇÃO: MUDADO DE 'void' PARA 'Future<bool> async' ---
+  Future<bool> connectAndListen() async {
+    String? accessToken;
+    int retries = 5; // Tentar por 1.5 segundos
+
+    // --- ADICIONADO: Loop de espera pelo token ---
+    // Isso corrige o problema do token 'null' logo após o login
+    while (retries > 0) {
+      accessToken = Supabase.instance.client.auth.currentSession?.accessToken;
+      if (accessToken != null) {
+        break; // Token encontrado!
+      }
+      debugPrint("SocketService: Aguardando accessToken... ($retries)");
+      await Future.delayed(const Duration(milliseconds: 300));
+      retries--;
+    }
+    // --- FIM DA ADIÇÃO ---
 
     if (accessToken == null) {
+      debugPrint("SocketService: Falha ao obter accessToken após espera.");
       _status = MatchmakingStatus.error;
       _errorMessage = "Usuário não autenticado.";
       notifyListeners();
-      return;
+      return false; // --- ALTERAÇÃO: Retorna falha
     }
 
+    debugPrint("SocketService: AccessToken obtido. Inicializando socket...");
     // Configura o socket com o token de autenticação
     _socket = IO.io(
       _serverUrl,
       IO.OptionBuilder()
           .setTransports(['websocket'])
           .disableAutoConnect()
-          .setAuth({
-            'token': accessToken,
-          }) // Envia o token para o middleware do servidor
+          .setAuth({'token': accessToken})
           .build(),
     );
 
     // --- Listeners de Eventos do Socket ---
-    _socket!.onConnect((_) {
-      debugPrint('✅ Conectado ao servidor de socket!');
+
+    _socket!.on('connect', (_) {
+      debugPrint('Socket Conectado: ${_socket!.id}');
     });
 
-    _socket!.onDisconnect((_) {
-      debugPrint('❌ Desconectado do servidor de socket.');
+    _socket!.on('connect_error', (data) {
+      debugPrint('Erro de Conexão: $data');
+      _status = MatchmakingStatus.error;
+      _errorMessage = 'Falha ao conectar ao servidor de jogo.';
+      notifyListeners();
+    });
+
+    _socket!.on('disconnect', (_) {
+      debugPrint('Socket Desconectado');
       _status = MatchmakingStatus.idle;
       _gameState = null;
       notifyListeners();
     });
 
-    _socket!.onError((data) {
-      debugPrint('Socket Error: $data');
+    _socket!.on('error', (data) {
+      debugPrint('Erro do Servidor: $data');
       _status = MatchmakingStatus.error;
-      _errorMessage = data.toString();
+      _errorMessage = data['message'] ?? 'Erro desconhecido do servidor.';
       notifyListeners();
     });
 
-    // --- Listeners de Eventos do JOGO ---
-
-    // O servidor informa que estamos na fila
-    _socket!.on('waitingForOpponent', (_) {
-      _status = MatchmakingStatus.searching;
-      notifyListeners();
-    });
-
-    // O servidor encontrou uma partida!
+    // Evento principal: Partida encontrada!
     _socket!.on('matchFound', (data) {
-      debugPrint('Partida encontrada! ID: ${data['matchId']}');
-      // Apenas atualiza o status, o primeiro GameState virá com o 'gameStateUpdate'
+      debugPrint('Partida Encontrada!');
+      _gameState = GameState.fromJson(data);
       _status = MatchmakingStatus.inMatch;
-      // Inicializa o estado do jogo se o servidor enviar um estado inicial aqui
-      // _gameState = GameState.fromJson(data['initialState']);
+      _errorMessage = null;
       notifyListeners();
     });
 
-    // O servidor envia o estado atualizado do jogo
+    // Evento principal: O estado do jogo foi atualizado
     _socket!.on('gameStateUpdate', (data) {
       _gameState = GameState.fromJson(data);
-      notifyListeners(); // Notifica a UI para se reconstruir com o novo estado
+      notifyListeners();
     });
 
-    // O oponente jogou uma carta (se você quiser fazer animações específicas)
-    _socket!.on('opponentPlayedCard', (data) {
-      debugPrint('Oponente jogou uma carta: $data');
-      // Você pode usar isso para disparar animações antes do 'gameStateUpdate' chegar
-    });
-
-    // O oponente desconectou
+    // Oponente desconectou
     _socket!.on('opponentLeft', (_) {
       debugPrint('Oponente desconectou.');
       // AQUI: Adicionar lógica para mostrar tela de vitória
@@ -108,18 +115,47 @@ class SocketService with ChangeNotifier {
     });
 
     _socket!.connect();
+    return true; // --- ALTERAÇÃO: Retorna sucesso
   }
 
   // --- 2. Funções para Enviar Eventos (Ações do Jogador) ---
 
-  /// Entra na fila de matchmaking no servidor.
+  // --- FUNÇÃO ALTERADA E SIMPLIFICADA ---
+  // A lógica de conexão agora é GARANTIDA pela LoginScreen.
+  // Se _socket for nulo aqui, é um erro de programação que deve ser reportado.
   void findMatch() {
+    // 1. Define o status
+    _status = MatchmakingStatus.searching;
+    _errorMessage = null;
+    notifyListeners();
+
+    // 2. Verifica se o socket está conectado
     if (_socket?.connected ?? false) {
+      debugPrint("SocketService: findMatch() chamado. Emitindo...");
       _socket!.emit('findMatch');
-      _status = MatchmakingStatus.searching;
+    } 
+    // 3. Verifica se o socket existe, mas não está conectado (ex: rede caiu)
+    else if (_socket != null && !_socket!.connected) {
+      debugPrint("SocketService: findMatch() chamado, mas socket não conectado. Tentando conectar...");
+      _socket!.connect(); // Tenta reconectar
+      // Ouve o evento de conexão APENAS UMA VEZ
+      _socket!.once('connect', (_) {
+        debugPrint("SocketService: Reconectado! Emitindo findMatch...");
+         if (_status == MatchmakingStatus.searching) { // Garante que o usuário não cancelou
+            _socket!.emit('findMatch');
+         }
+      });
+    } 
+    // 4. Se o socket for nulo, algo deu errado no login.
+    else {
+      debugPrint("SocketService: findMatch() FALHOU. _socket é nulo. A conexão no login falhou.");
+      _status = MatchmakingStatus.error;
+      _errorMessage = "Erro de conexão. Tente fazer login novamente.";
       notifyListeners();
     }
   }
+  // --- FIM DA ALTERAÇÃO ---
+
 
   /// Sai da fila de matchmaking.
   void cancelFindMatch() {
@@ -135,17 +171,24 @@ class SocketService with ChangeNotifier {
     if (status != MatchmakingStatus.inMatch || _gameState == null) return;
 
     _socket!.emit('playCard', {
-      'matchId': _gameState!.matchId,
       'cardId': cardId,
-      'positionX': positionX,
-      'positionY': positionY,
+      'position': {'x': positionX, 'y': positionY},
     });
   }
 
-  // --- 3. Limpeza ---
+  /// Envia um emote para o oponente.
+  void sendEmote(String emoteId) {
+    if (status != MatchmakingStatus.inMatch || _gameState == null) return;
 
-  void dispose() {
+    _socket!.emit('sendEmote', {
+      'emoteId': emoteId,
+    });
+  }
+
+  /// Desconecta do socket.
+  void disposeSocket() {
+    _socket?.disconnect();
     _socket?.dispose();
-    super.dispose();
+    _socket = null;
   }
 }

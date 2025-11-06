@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:math';
-
-// TODO: Se a tela de batalha for o próximo passo, importe-a.
-// import 'package:cajucards/screens/battle_screen.dart';
+import 'package:provider/provider.dart';
+import 'package:cajucards/api/services/socket_service.dart';
+import 'package:cajucards/screens/battle_screen.dart'; 
 
 class MatchmakingScreen extends StatefulWidget {
   const MatchmakingScreen({super.key});
@@ -71,157 +71,199 @@ class _MatchmakingScreenState extends State<MatchmakingScreen>
       }
     });
 
-    Future.delayed(const Duration(seconds: 10), () {
-      if (mounted) {
-        /*
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const BattleScreen()),
-        );
-        */
-      }
-    });
+    // --- REMOVIDO ---
+    // O Future.delayed de 10 segundos foi removido.
+    // A navegação agora é controlada pelo Consumer no método build().
+    // --- FIM DA REMOÇÃO ---
   }
 
   @override
   void dispose() {
+    // --- LÓGICA DE CANCELAMENTO ADICIONADA ---
+    // Se o usuário sair desta tela (ex: apertar "Voltar")
+    // E ele ainda estiver procurando, cancele a busca!
+    
+    // Usamos 'context.read' porque estamos no dispose
+    final socketService = context.read<SocketService>();
+    if (socketService.status == MatchmakingStatus.searching) {
+      socketService.cancelFindMatch(); //
+    }
+    // --- FIM DA LÓGICA ---
+
     _pulsarController.dispose();
     _dotsTimer?.cancel();
     _phrasesTimer?.cancel();
     super.dispose();
   }
 
+  String _getTextoCarregamento(MatchmakingStatus status) {
+    switch (status) {
+      case MatchmakingStatus.searching:
+        return 'Procurando oponente$_loadingDots';
+      case MatchmakingStatus.inMatch:
+        return 'Partida encontrada!';
+      case MatchmakingStatus.idle:
+        return 'Cancelado$_loadingDots';
+      case MatchmakingStatus.error:
+        return 'Erro ao conectar$_loadingDots';
+      default:
+        return 'Carregando$_loadingDots';
+    }
+  }
+  // --- FIM DO MÉTODO ---
+
   @override
   Widget build(BuildContext context) {
     const double tamanhoCastanha = 150.0;
 
-    return Scaffold(
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Imagem de fundo
-          Image.asset('assets/images/WoodBasic.png', fit: BoxFit.cover),
+    // --- WIDGET CONSUMER ADICIONADO ---
+    // Este widget "escuta" o SocketService e reconstrói
+    // a UI quando o status da partida mudar.
+    return Consumer<SocketService>(
+      builder: (context, socketService, child) {
+        
+        // --- LÓGICA DE NAVEGAÇÃO ADICIONADA ---
+        if (socketService.status == MatchmakingStatus.inMatch) {
+          // Usamos addPostFrameCallback para navegar *após* o build
+          // Isso evita erros de "setState/Navigator during build"
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const BattleScreen()),
+              );
+            }
+          });
+        }
+        // --- FIM DA LÓGICA ---
 
-          // 1. Logo posicionada no topo
-          SafeArea(
-            // SafeArea evita que a logo cole na barra de status do celular
-            child: Align(
-              alignment: Alignment.topCenter, // Alinha no centro do topo
-              child: Padding(
-                padding: EdgeInsets.only(
-                  top: 10.0,
-                ), // Ajuste esse valor para descer mais ou menos
-                child: Image.asset(
-                  'assets/images/Logo.png',
-                  width:
-                      MediaQuery.of(context).size.width *
-                      0.6, // Aumentei um pouco pra dar mais destaque, ajuste como preferir
+        // O Scaffold e todo o resto da UI original
+        return Scaffold(
+          body: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Imagem de fundo
+              Image.asset('assets/images/WoodBasic.png', fit: BoxFit.cover),
+
+              // 1. Logo posicionada no topo
+              SafeArea(
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: Padding(
+                    padding: EdgeInsets.only(top: 10.0),
+                    child: Image.asset(
+                      'assets/images/Logo.png',
+                      width: MediaQuery.of(context).size.width * 0.6,
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
 
-          // 2. Caju e texto centralizados (sem a logo)
-          Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AnimatedBuilder(
-                  animation: _pulsarAnimation,
-                  builder: (context, child) {
-                    return Transform.translate(
-                      offset: Offset(0, _pulsarAnimation.value),
-                      child: child,
-                    );
-                  },
-                  child: Image.asset(
-                    'assets/images/caju.png', //
-                    width: 100,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  'Carregando$_loadingDots',
-                  style: const TextStyle(
-                    fontFamily: 'VT323',
-                    fontSize: 30,
-                    color: Color(0xFFDD7326),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // --- FIM DO AJUSTE ---
-
-          // Container de frases na parte inferior
-          Positioned(
-            bottom: MediaQuery.of(context).size.height * 0.1,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Container(
-                width: MediaQuery.of(context).size.width * 0.8,
-                height: 150,
-                decoration: const BoxDecoration(
-                  image: DecorationImage(
-                    image: AssetImage('assets/images/frasesContainer.png'), //
-                    fit: BoxFit.fill,
-                  ),
-                ),
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 40.0),
-                    child: Text(
-                      _phrases[_currentPhraseIndex],
-                      textAlign: TextAlign.center,
+              // 2. Caju e texto centralizados
+              Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedBuilder(
+                      animation: _pulsarAnimation,
+                      builder: (context, child) {
+                        return Transform.translate(
+                          offset: Offset(0, _pulsarAnimation.value),
+                          child: child,
+                        );
+                      },
+                      child: Image.asset(
+                        'assets/images/caju.png',
+                        width: 100,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    // --- TEXTO MODIFICADO ---
+                    // Agora usa o método auxiliar para mostrar o status
+                    Text(
+                      _getTextoCarregamento(socketService.status),
                       style: const TextStyle(
                         fontFamily: 'VT323',
-                        fontSize: 36,
+                        fontSize: 30,
                         color: Color(0xFFDD7326),
-                        height: 1.2,
+                      ),
+                    ),
+                    // --- FIM DA MODIFICAÇÃO ---
+                  ],
+                ),
+              ),
+
+              // Container de frases na parte inferior
+              Positioned(
+                bottom: MediaQuery.of(context).size.height * 0.1,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Container(
+                    width: MediaQuery.of(context).size.width * 0.8,
+                    height: 150,
+                    decoration: const BoxDecoration(
+                      image: DecorationImage(
+                        image: AssetImage('assets/images/frasesContainer.png'),
+                        fit: BoxFit.fill,
+                      ),
+                    ),
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 40.0),
+                        child: Text(
+                          _phrases[_currentPhraseIndex],
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontFamily: 'VT323',
+                            fontSize: 36,
+                            color: Color(0xFFDD7326),
+                            height: 1.2,
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ),
 
-          // Castanhas nos cantos
-          Positioned(
-            top: 10,
-            left: 10,
-            child: Image.asset(
-              'assets/images/Castanha1Cima.png', //
-              width: tamanhoCastanha,
-            ),
+              // Castanhas nos cantos
+              Positioned(
+                top: 10,
+                left: 10,
+                child: Image.asset(
+                  'assets/images/Castanha1Cima.png',
+                  width: tamanhoCastanha,
+                ),
+              ),
+              Positioned(
+                top: 10,
+                right: 10,
+                child: Image.asset(
+                  'assets/images/Castanha2Cima.png',
+                  width: tamanhoCastanha,
+                ),
+              ),
+              Positioned(
+                bottom: 10,
+                left: 10,
+                child: Image.asset(
+                  'assets/images/Castanha1Baixo.png',
+                  width: tamanhoCastanha,
+                ),
+              ),
+              Positioned(
+                bottom: 10,
+                right: 10,
+                child: Image.asset(
+                  'assets/images/Castanha2Baixo.png',
+                  width: tamanhoCastanha,
+                ),
+              ),
+            ],
           ),
-          Positioned(
-            top: 10,
-            right: 10,
-            child: Image.asset(
-              'assets/images/Castanha2Cima.png', //
-              width: tamanhoCastanha,
-            ),
-          ),
-          Positioned(
-            bottom: 10,
-            left: 10,
-            child: Image.asset(
-              'assets/images/Castanha1Baixo.png', //
-              width: tamanhoCastanha,
-            ),
-          ),
-          Positioned(
-            bottom: 10,
-            right: 10,
-            child: Image.asset(
-              'assets/images/Castanha2Baixo.png', //
-              width: tamanhoCastanha,
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

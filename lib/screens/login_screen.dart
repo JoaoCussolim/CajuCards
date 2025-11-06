@@ -5,7 +5,8 @@ import 'initial_screen.dart';
 import 'register_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:cajucards/providers/player_provider.dart';
-import 'package:cajucards/screens/battle_screen.dart';
+// import 'package:cajucards/screens/battle_screen.dart'; // Removido (não é chamado daqui)
+import 'package:cajucards/api/services/socket_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -71,10 +72,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final currentContext = context;
     if (!currentContext.mounted) return;
 
-    setState(() => _isLoading = false);
-
     // 4. Trata o resultado
-
     if (result.success) {
       final playerProvider = Provider.of<PlayerProvider>(
         currentContext,
@@ -82,18 +80,40 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       final success = await playerProvider.fetchAndSetPlayer();
 
-      // Verifique se o widget ainda está montado DEPOIS do await
-      if (!mounted) return; // Use 'mounted' diretamente (disponível em State)
+      if (!mounted) return;
 
       if (success) {
         _showSuccessToast('Login efetuado! Bem-vindo(a) de volta.');
-        // Use o 'context' atual que você sabe que é válido porque 'mounted' é true
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const PlaygroundScreen()),
-        );
+
+        // --- INÍCIO DA ALTERAÇÃO PRINCIPAL ---
+        bool socketConnected = false;
+        try {
+          // 1. ADICIONADO 'await': Agora esperamos a função terminar.
+          // 2. ADICIONADO 'socketConnected': Salvamos o resultado (true/false)
+          socketConnected =
+              await context.read<SocketService>().connectAndListen();
+        } catch (e) {
+          debugPrint("Erro ao iniciar SocketService: $e");
+          _showErrorToast("Erro ao conectar ao servidor de jogo.");
+        }
+
+        if (!mounted) return;
+
+        // 3. ADICIONADO 'if/else': Só navegamos se a conexão do socket
+        //    foi bem-sucedida (retornou true).
+        if (socketConnected) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const InitialScreen()),
+          );
+        } else {
+          // A conexão do socket falhou (provavelmente token nulo ou timeout)
+          setState(() => _isLoading = false); // Para o loading
+          _showErrorToast(context.read<SocketService>().errorMessage ??
+              "Falha ao conectar ao servidor de jogo. Tente novamente.");
+        }
+        // --- FIM DA ALTERAÇÃO ---
       } else {
-        // Se já estava aqui, não precisa mais do setState para isLoading
-        // setState(() => _isLoading = false); // Pode remover se já fez antes
+        setState(() => _isLoading = false);
         _showErrorToast(
           playerProvider.error ?? 'Não foi possível carregar seus dados.',
         );
@@ -192,7 +212,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           Image.asset(
                             'assets/images/Login.png',
                             width: 200,
-                          ), // Supondo que você tenha um asset 'Login.png'
+                          ),
                           const SizedBox(height: 20),
                           _buildTextField(
                             labelText: 'E-mail',
@@ -255,8 +275,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // --- Widgets e Funções Auxiliares (com a mesma estilização da tela de registro) ---
-
   Widget _buildStrokedText(
     String text,
     double fontSize,
@@ -272,7 +290,7 @@ class _LoginScreenState extends State<LoginScreen> {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: fontSize,
-              fontFamily: 'VT323',
+              fontFamily: 'VT3323',
               fontWeight: FontWeight.w600,
               foreground: Paint()
                 ..style = PaintingStyle.stroke
@@ -287,7 +305,7 @@ class _LoginScreenState extends State<LoginScreen> {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: fontSize,
-              fontFamily: 'VT323',
+              fontFamily: 'VT3323',
               fontWeight: FontWeight.w600,
               color: fillColor,
             ),
@@ -323,9 +341,7 @@ class _LoginScreenState extends State<LoginScreen> {
               child: TextFormField(
                 controller: controller,
                 keyboardType: TextInputType.emailAddress,
-
                 cursorColor: Colors.white,
-
                 style: const TextStyle(
                   color: Colors.white,
                   fontFamily: 'VT323',
@@ -377,10 +393,7 @@ class _LoginScreenState extends State<LoginScreen> {
               child: TextFormField(
                 controller: controller,
                 obscureText: isObscured,
-
-                // E ADICIONE ESTA LINHA AQUI TAMBÉM 👇
                 cursorColor: Colors.white,
-
                 style: const TextStyle(
                   color: Colors.white,
                   fontFamily: 'VT323',
