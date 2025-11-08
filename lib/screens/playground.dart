@@ -11,45 +11,6 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:cajucards/models/card.dart' as card_model;
 
-class ArenaLane extends RectangleComponent {
-  ArenaLane({
-    required Vector2 size,
-    required Vector2 position,
-  }) : super(
-          size: size,
-          position: position,
-          anchor: Anchor.center,
-          paint: Paint()..color = const Color(0xFF363B57),
-        );
-}
-
-class RiverComponent extends RectangleComponent {
-  RiverComponent({
-    required Vector2 size,
-    required Vector2 position,
-  }) : super(
-          size: size,
-          position: position,
-          anchor: Anchor.center,
-          paint: Paint()..color = const Color(0xFF2B7A9E),
-        );
-}
-
-class TowerSlotComponent extends RectangleComponent {
-  TowerSlotComponent({
-    required Vector2 size,
-    required Vector2 position,
-  }) : super(
-          size: size,
-          position: position,
-          anchor: Anchor.center,
-          paint: Paint()
-            ..color = Colors.white.withOpacity(0.4)
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 2,
-        );
-}
-
 class TowerComponent extends RectangleComponent {
   TowerComponent({
     required Vector2 size,
@@ -113,7 +74,7 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
   Future<void> onLoad() async {
     super.onLoad();
 
-    _buildArena();
+    await _buildArena();
 
     final textStyle = TextPaint(
       style: const TextStyle(
@@ -165,20 +126,23 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     }
   }
 
-  void _buildArena() {
-    final laneWidth = size.x * 0.85;
-    final laneHeight = size.y * 0.2;
-    final riverHeight = size.y * 0.04;
-    final dividerHeight = size.y * 0.8;
+  Future<void> _buildArena() async {
+    final dividerHeight = size.y * 0.9;
 
-    add(ArenaLane(
-      size: Vector2(laneWidth, laneHeight),
-      position: Vector2(size.x / 2, size.y / 2),
+    final groundSprite = await Sprite.load('assets/images/WoodBasic.png');
+
+    add(SpriteComponent(
+      sprite: groundSprite,
+      size: Vector2(size.x / 2, size.y),
+      position: Vector2.zero(),
+      anchor: Anchor.topLeft,
     ));
 
-    add(RiverComponent(
-      size: Vector2(laneWidth, riverHeight),
-      position: Vector2(size.x / 2, size.y / 2),
+    add(SpriteComponent(
+      sprite: groundSprite,
+      size: Vector2(size.x / 2, size.y),
+      position: Vector2(size.x, 0),
+      anchor: Anchor.topRight,
     ));
 
     add(ArenaDivider(
@@ -186,41 +150,18 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
       position: Vector2(size.x / 2, size.y / 2),
     ));
 
-    final slotCount = 3;
-    final slotWidth = laneWidth / (slotCount + 1);
-    final slotHeight = size.y * 0.1;
-    final slotSpacing = slotWidth * 0.1;
-    final totalSlotsWidth = slotCount * slotWidth + (slotCount - 1) * slotSpacing;
-    final startX = (size.x - totalSlotsWidth) / 2 + slotWidth / 2;
-    final bottomY = size.y * 0.7;
-    final topY = size.y * 0.3;
-
-    for (var i = 0; i < slotCount; i++) {
-      final x = startX + i * (slotWidth + slotSpacing);
-      add(TowerSlotComponent(
-        size: Vector2(slotWidth, slotHeight),
-        position: Vector2(x, bottomY),
-      ));
-      add(TowerSlotComponent(
-        size: Vector2(slotWidth, slotHeight),
-        position: Vector2(x, topY),
-      ));
-    }
-
-    final towerSize = Vector2(size.x * 0.12, size.y * 0.18);
-    final horizontalPadding = size.x * 0.05;
-    final verticalPadding = size.y * 0.05;
+    final towerSize = Vector2(size.x * 0.1, size.y * 0.18);
 
     add(TowerComponent(
       size: towerSize,
-      position: Vector2(horizontalPadding, size.y - verticalPadding),
-      anchor: Anchor.bottomLeft,
+      position: Vector2(0, size.y / 2),
+      anchor: Anchor.centerLeft,
     ));
 
     add(TowerComponent(
       size: towerSize,
-      position: Vector2(size.x - horizontalPadding, verticalPadding),
-      anchor: Anchor.topRight,
+      position: Vector2(size.x, size.y / 2),
+      anchor: Anchor.centerRight,
       isOpponent: true,
     ));
   }
