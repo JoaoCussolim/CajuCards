@@ -67,6 +67,18 @@ class TowerComponent extends RectangleComponent {
         );
 }
 
+class ArenaDivider extends RectangleComponent {
+  ArenaDivider({
+    required Vector2 size,
+    required Vector2 position,
+  }) : super(
+          size: size,
+          position: position,
+          anchor: Anchor.center,
+          paint: Paint()..color = Colors.white.withOpacity(0.35),
+        );
+}
+
 class Enemy extends SpriteComponent {
   Enemy() : super(size: Vector2.all(80));
 
@@ -85,8 +97,14 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
   final double maxEnergy = 10.0;
   final double energyPerSecond = 1.0;
   late final TextComponent energyText;
+  late final TextComponent matchTimerText;
+  double matchTimeSeconds = 0;
   final ValueNotifier<double> energyRatioNotifier = ValueNotifier(0);
+  final ValueNotifier<List<card_model.Card>> shopCardsNotifier =
+      ValueNotifier<List<card_model.Card>>([]);
+  final int shopSize = 3;
   Enemy? enemy;
+  List<card_model.Card> _allCards = [];
 
   @override
   Color backgroundColor() => const Color(0xFF2a2e42);
@@ -112,6 +130,14 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     );
     add(energyText);
 
+    matchTimerText = TextComponent(
+      text: 'Tempo: 0.0s',
+      textRenderer: textStyle,
+      position: Vector2(size.x / 2, size.y * 0.1),
+      anchor: Anchor.topCenter,
+    );
+    add(matchTimerText);
+
     enemy = Enemy()
       ..position =
           Vector2(size.x / 2, size.y * 0.25)
@@ -122,32 +148,16 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
 
     try {
       print("Buscando cartas...");
-      final List<card_model.Card> allCards = await cardService.getAllCards();
-      print("Recebidas ${allCards.length} cartas.");
+      _allCards = await cardService.getAllCards();
+      print("Recebidas ${_allCards.length} cartas.");
 
-      if (allCards.isEmpty) {
+      if (_allCards.isEmpty) {
         print("Nenhuma carta encontrada na API.");
         return;
       }
 
-      double xPos = 50.0;
-      double yPos = size.y - 150.0;
-      const double xGap = 120.0;
-
-      for (var cardData in allCards) {
-        final cardSprite = CardSprite(
-          card: cardData,
-          game: this,
-        )..position = Vector2(xPos, yPos);
-
-        add(cardSprite);
-
-        xPos += xGap;
-        if (xPos + cardSize.x > size.x) {
-          xPos = 50.0;
-          yPos -= (cardSize.y + 20);
-        }
-      }
+      _dealHandCards();
+      _populateShop();
     } catch (e, stackTrace) {
       print("--- ERRO AO CARREGAR CARTAS DA API ---");
       print(e);
@@ -159,6 +169,7 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     final laneWidth = size.x * 0.85;
     final laneHeight = size.y * 0.2;
     final riverHeight = size.y * 0.04;
+    final dividerHeight = size.y * 0.8;
 
     add(ArenaLane(
       size: Vector2(laneWidth, laneHeight),
@@ -167,6 +178,11 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
 
     add(RiverComponent(
       size: Vector2(laneWidth, riverHeight),
+      position: Vector2(size.x / 2, size.y / 2),
+    ));
+
+    add(ArenaDivider(
+      size: Vector2(size.x * 0.01, dividerHeight),
       position: Vector2(size.x / 2, size.y / 2),
     ));
 
@@ -203,19 +219,6 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
 
     add(TowerComponent(
       size: towerSize,
-      position: Vector2(size.x - horizontalPadding, size.y - verticalPadding),
-      anchor: Anchor.bottomRight,
-    ));
-
-    add(TowerComponent(
-      size: towerSize,
-      position: Vector2(horizontalPadding, verticalPadding),
-      anchor: Anchor.topLeft,
-      isOpponent: true,
-    ));
-
-    add(TowerComponent(
-      size: towerSize,
       position: Vector2(size.x - horizontalPadding, verticalPadding),
       anchor: Anchor.topRight,
       isOpponent: true,
@@ -232,6 +235,8 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
         currentEnergy = maxEnergy;
       }
     }
+    matchTimeSeconds += dt;
+    matchTimerText.text = 'Tempo: ${matchTimeSeconds.toStringAsFixed(1)}s';
     energyText.text = 'Energia: ${currentEnergy.floor()}/${maxEnergy.floor()}';
     energyRatioNotifier.value = currentEnergy / maxEnergy;
   }
@@ -239,7 +244,49 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
   @override
   void onRemove() {
     energyRatioNotifier.dispose();
+    shopCardsNotifier.dispose();
     super.onRemove();
+  }
+
+  void _dealHandCards() {
+    final handCount = math.min(5, _allCards.length);
+    final handCards = _allCards.take(handCount).toList();
+
+    for (var i = 0; i < handCards.length; i++) {
+      final cardData = handCards[i];
+      final cardSprite = CardSprite(
+        card: cardData,
+        game: this,
+      )
+        ..anchor = Anchor.bottomLeft
+        ..position = Vector2(
+          20 + i * (cardSize.x + 12),
+          size.y - 20,
+        );
+
+      add(cardSprite);
+    }
+  }
+
+  void _populateShop() {
+    if (_allCards.isEmpty) {
+      return;
+    }
+
+    _allCards.shuffle();
+    final selection = _allCards.take(math.min(shopSize, _allCards.length)).toList();
+    shopCardsNotifier.value = selection;
+  }
+
+  void rerollShop() {
+    if (currentEnergy < 1) {
+      return;
+    }
+
+    currentEnergy -= 1;
+    _populateShop();
+    energyText.text = 'Energia: ${currentEnergy.floor()}/${maxEnergy.floor()}';
+    energyRatioNotifier.value = currentEnergy / maxEnergy;
   }
 
   void spawnCreatureAndAttack(card_model.Card cardData) {
@@ -370,8 +417,117 @@ class _PlaygroundScreenState extends State<PlaygroundScreen> {
               ),
             );
           },
+          'shopOverlay': (context, game) {
+            final cajuGame = game as CajuPlaygroundGame;
+            return Align(
+              alignment: Alignment.bottomRight,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 320),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.45),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white24),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Text(
+                            'Loja',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontFamily: 'VT323',
+                              fontSize: 24,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          ValueListenableBuilder<List<card_model.Card>>(
+                            valueListenable: cajuGame.shopCardsNotifier,
+                            builder: (context, cards, _) {
+                              if (cards.isEmpty) {
+                                return const Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 12),
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                );
+                              }
+
+                              return Column(
+                                children: [
+                                  for (final card in cards)
+                                    Padding(
+                                      padding:
+                                          const EdgeInsets.symmetric(vertical: 4),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              card.name,
+                                              style: const TextStyle(
+                                                fontFamily: 'VT323',
+                                                fontSize: 18,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ),
+                                          Text(
+                                            '${card.chestnutCost}⚡',
+                                            style: const TextStyle(
+                                              fontFamily: 'VT323',
+                                              fontSize: 18,
+                                              color: Colors.white70,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                ],
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          ValueListenableBuilder<double>(
+                            valueListenable: cajuGame.energyRatioNotifier,
+                            builder: (context, _, __) {
+                              final canReroll = cajuGame.currentEnergy >= 1;
+                              return ElevatedButton(
+                                onPressed: canReroll
+                                    ? () {
+                                        cajuGame.rerollShop();
+                                      }
+                                    : null,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF42c2ff),
+                                  disabledBackgroundColor:
+                                      Colors.blueGrey.shade700,
+                                ),
+                                child: const Text(
+                                  'Reroll (1 energia)',
+                                  style: TextStyle(
+                                    fontFamily: 'VT323',
+                                    fontSize: 18,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
         },
-        initialActiveOverlays: const ['energyHud'],
+        initialActiveOverlays: const ['energyHud', 'shopOverlay'],
       ),
     );
   }
