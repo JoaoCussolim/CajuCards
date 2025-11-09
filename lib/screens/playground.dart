@@ -222,8 +222,16 @@ class Enemy extends SpriteComponent {
 }
 
 class CajuPlaygroundGame extends FlameGame with TapCallbacks {
-  final SocketService socketService;
-  CajuPlaygroundGame({required this.socketService});
+  CajuPlaygroundGame({this.socketService, this.isBotMode = false})
+      : _simulationRunning = false;
+
+  CajuPlaygroundGame.bot() : this(isBotMode: true);
+
+  final SocketService? socketService;
+  final bool isBotMode;
+
+  bool _simulationRunning;
+  bool _initialized = false;
 
   double currentEnergy = 0.0;
   final double maxEnergy = 10.0;
@@ -238,6 +246,13 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
       ValueNotifier<List<card_model.Card>>([]);
   final ValueNotifier<String?> backgroundSynergyNotifier =
       ValueNotifier<String?>(null);
+  final ValueNotifier<double> playerHealthRatioNotifier =
+      ValueNotifier<double>(1);
+  final ValueNotifier<double> opponentHealthRatioNotifier =
+      ValueNotifier<double>(1);
+  final ValueNotifier<bool> simulationRunningNotifier =
+      ValueNotifier<bool>(false);
+  final ValueNotifier<bool> readinessNotifier = ValueNotifier<bool>(false);
   final int shopSize = 3;
   Enemy? enemy;
 
@@ -248,6 +263,12 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
   BotController? _botController;
 
   String? get activeBackgroundSynergy => backgroundSynergyNotifier.value;
+  bool get isSimulationRunning => _simulationRunning;
+  bool get isReady => _initialized;
+
+  double playerHealth = 100;
+  double opponentHealth = 100;
+  final double maxHealth = 100;
 
   Map<TroopComponent, card_model.TroopCard> get creaturesInField =>
       Map.unmodifiable(_creaturesInField);
@@ -331,6 +352,15 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     if (_allCards.isNotEmpty) {
       _botController = BotController(game: this);
     }
+
+    _initialized = true;
+    readinessNotifier.value = true;
+
+    resetSimulation();
+
+    if (!isBotMode) {
+      startSimulation();
+    }
   }
 
   Future<void> _buildArena() async {
@@ -411,6 +441,10 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
   void update(double dt) {
     super.update(dt);
 
+    if (!_simulationRunning) {
+      return;
+    }
+
     if (currentEnergy < maxEnergy) {
       currentEnergy += energyPerSecond * dt;
       if (currentEnergy > maxEnergy) {
@@ -431,7 +465,80 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     energyRatioNotifier.dispose();
     shopCardsNotifier.dispose();
     backgroundSynergyNotifier.dispose();
+    playerHealthRatioNotifier.dispose();
+    opponentHealthRatioNotifier.dispose();
+    simulationRunningNotifier.dispose();
+    readinessNotifier.dispose();
     super.onRemove();
+  }
+
+  void startSimulation() {
+    if (!_initialized || _simulationRunning) {
+      return;
+    }
+    _simulationRunning = true;
+    simulationRunningNotifier.value = true;
+    _botController?.reset();
+  }
+
+  void stopSimulation() {
+    if (!_initialized || !_simulationRunning) {
+      return;
+    }
+    _simulationRunning = false;
+    simulationRunningNotifier.value = false;
+  }
+
+  void resetSimulation() {
+    if (!_initialized) {
+      return;
+    }
+
+    stopSimulation();
+
+    currentEnergy = 0;
+    matchTimeSeconds = 0;
+    playerHealth = maxHealth;
+    opponentHealth = maxHealth;
+    energyText.text = 'Energia: 0/${maxEnergy.floor()}';
+    matchTimerText.text = 'Tempo: 0.0s';
+    energyRatioNotifier.value = 0;
+    playerHealthRatioNotifier.value = 1;
+    opponentHealthRatioNotifier.value = 1;
+    _clearBattlefield();
+    resetBackgroundBiome();
+    _populateShop();
+    _botController?.reset();
+  }
+
+  void applyBaseDamage({required bool toOpponent, required double amount}) {
+    if (!_initialized || amount <= 0) {
+      return;
+    }
+
+    if (toOpponent) {
+      opponentHealth = (opponentHealth - amount).clamp(0, maxHealth);
+      opponentHealthRatioNotifier.value = opponentHealth / maxHealth;
+    } else {
+      playerHealth = (playerHealth - amount).clamp(0, maxHealth);
+      playerHealthRatioNotifier.value = playerHealth / maxHealth;
+    }
+  }
+
+  void _clearBattlefield() {
+    if (!_initialized) {
+      return;
+    }
+
+    for (final troop in List<TroopComponent>.from(_creaturesInField.keys)) {
+      troop.removeFromParent();
+    }
+    _creaturesInField.clear();
+
+    for (final troop in List<TroopComponent>.from(_opponentTroops.keys)) {
+      troop.removeFromParent();
+    }
+    _opponentTroops.clear();
   }
 
   void _dealHandCards() {
@@ -609,6 +716,10 @@ class BotController {
   final math.Random _random = math.Random();
 
   void update(double dt) {
+    if (!game._simulationRunning) {
+      return;
+    }
+
     if (game._allCards.isEmpty) {
       return;
     }
@@ -619,6 +730,11 @@ class BotController {
     }
 
     _playRandomCard();
+    _resetTimer();
+  }
+
+  void reset() {
+    _decisionTimer = 0;
     _resetTimer();
   }
 
