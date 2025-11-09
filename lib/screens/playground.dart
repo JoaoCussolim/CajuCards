@@ -30,6 +30,28 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
   final double energyPerSecond = 1.0;
   late final TextComponent energyText;
   Enemy? enemy;
+  final Map<CreatureSprite, String> _creaturesInField = {};
+  String? activeBackgroundSynergy;
+
+  Map<CreatureSprite, String> get creaturesInField =>
+      Map.unmodifiable(_creaturesInField);
+
+  Set<String> get activeSynergies => _creaturesInField.values.toSet();
+
+  bool canSummonCreatureWithSynergy(String synergy) {
+    final currentSynergies = activeSynergies;
+
+    if (currentSynergies.contains(synergy)) {
+      return true;
+    }
+
+    if (activeBackgroundSynergy != null &&
+        activeBackgroundSynergy == synergy) {
+      return true;
+    }
+
+    return currentSynergies.length < 4;
+  }
 
   @override
   Color backgroundColor() => const Color(0xFF2a2e42);
@@ -118,6 +140,7 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
           2
       ..anchor = Anchor.center;
 
+    _trackCreature(creature, cardData.synergy);
     add(creature);
 
     final pause = MoveEffect.by(
@@ -149,6 +172,13 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     ]);
 
     creature.add(sequence);
+  }
+
+  void _trackCreature(CreatureSprite creature, String synergy) {
+    _creaturesInField[creature] = synergy;
+    creature.onRemovedCallback = () {
+      _creaturesInField.remove(creature);
+    };
   }
 }
 
