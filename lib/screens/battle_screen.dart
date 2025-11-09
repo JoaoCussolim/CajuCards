@@ -3,11 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cajucards/providers/player_provider.dart';
 import 'package:cajucards/models/player.dart';
-import 'package:flame/game.dart';
-import 'package:cajucards/screens/playground.dart';
 import 'shop_screen.dart';
 import 'history_screen.dart';
 import 'package:cajucards/api/services/socket_service.dart';
+import 'training_battle_screen.dart';
 
 enum BattleMode { pvp, training }
 
@@ -19,15 +18,10 @@ class BattleScreen extends StatefulWidget {
 }
 
 class _BattleScreenState extends State<BattleScreen> {
-  late final CajuPlaygroundGame _trainingGame;
   BattleMode _selectedMode = BattleMode.pvp;
+  bool _launchingTraining = false;
 
   @override
-  void initState() {
-    super.initState();
-    _trainingGame = CajuPlaygroundGame.bot();
-  }
-
   void _onModeSelected(BattleMode mode) {
     if (_selectedMode == mode) {
       return;
@@ -36,12 +30,6 @@ class _BattleScreenState extends State<BattleScreen> {
     setState(() {
       _selectedMode = mode;
     });
-
-    if (mode == BattleMode.training) {
-      _trainingGame.resetSimulation();
-    } else {
-      _trainingGame.stopSimulation();
-    }
   }
 
   void _startMatchmaking() {
@@ -57,23 +45,31 @@ class _BattleScreenState extends State<BattleScreen> {
     );
   }
 
-  void _startTraining() {
-    _trainingGame.resetSimulation();
-    _trainingGame.startSimulation();
-  }
+  Future<void> _openTraining() async {
+    if (_launchingTraining) {
+      return;
+    }
 
-  void _stopTraining() {
-    _trainingGame.stopSimulation();
-  }
+    setState(() {
+      _launchingTraining = true;
+    });
 
-  void _resetTraining() {
-    _trainingGame.resetSimulation();
-  }
+    await Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) => const TrainingBattleScreen(),
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
+      ),
+    );
 
-  @override
-  void dispose() {
-    _trainingGame.stopSimulation();
-    super.dispose();
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _launchingTraining = false;
+    });
   }
 
   @override
@@ -197,10 +193,8 @@ class _BattleScreenState extends State<BattleScreen> {
                           )
                         : _TrainingPanel(
                             key: const ValueKey('training-mode'),
-                            game: _trainingGame,
-                            onStart: _startTraining,
-                            onStop: _stopTraining,
-                            onReset: _resetTraining,
+                            onLaunch: _openTraining,
+                            isLoading: _launchingTraining,
                           ),
                   ),
                 ),
@@ -396,235 +390,58 @@ class _PvpPanel extends StatelessWidget {
 class _TrainingPanel extends StatelessWidget {
   const _TrainingPanel({
     super.key,
-    required this.game,
-    required this.onStart,
-    required this.onStop,
-    required this.onReset,
+    required this.onLaunch,
+    required this.isLoading,
   });
 
-  final CajuPlaygroundGame game;
-  final VoidCallback onStart;
-  final VoidCallback onStop;
-  final VoidCallback onReset;
+  final VoidCallback onLaunch;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
     return Column(
-      children: [
-        _TrainingHud(game: game),
-        const SizedBox(height: 12),
-        Expanded(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(28),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.25),
-                border: Border.all(color: Colors.white24),
-              ),
-              child: GameWidget(game: game),
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
-        ValueListenableBuilder<bool>(
-          valueListenable: game.readinessNotifier,
-          builder: (context, ready, _) {
-            return ValueListenableBuilder<bool>(
-              valueListenable: game.simulationRunningNotifier,
-              builder: (context, running, __) {
-                final buttonLabel = running ? 'Encerrar Treino' : 'Iniciar Treino';
-                final action = running ? onStop : onStart;
-                final displayLabel = ready ? buttonLabel : 'Carregando Treino';
-                return Column(
-                  children: [
-                    GestureDetector(
-                      onTap: ready ? action : null,
-                      child: Opacity(
-                        opacity: ready ? 1 : 0.6,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            Image.asset('assets/images/buttonBattle.png', width: 420),
-                            Text(
-                              displayLabel,
-                              style: const TextStyle(
-                                fontFamily: 'VT323',
-                                fontSize: 38,
-                                color: Colors.white,
-                                shadows: [
-                                  Shadow(
-                                    offset: Offset(0, 2),
-                                    blurRadius: 6,
-                                    color: Colors.black54,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    if (!ready) ...[
-                      const SizedBox(height: 12),
-                      const Text(
-                        'Preparando cartas e arena local...',
-                        style: TextStyle(
-                          fontFamily: 'VT323',
-                          fontSize: 22,
-                          color: Colors.white70,
-                        ),
-                      ),
-                    ],
-                    if (running && ready) ...[
-                      const SizedBox(height: 8),
-                      TextButton(
-                        onPressed: () {
-                          onReset();
-                          onStart();
-                        },
-                        child: const Text(
-                          'Reiniciar Simulação',
-                          style: TextStyle(
-                            fontFamily: 'VT323',
-                            fontSize: 22,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                );
-              },
-            );
-          },
-        ),
-      ],
-    );
-  }
-}
-
-class _TrainingHud extends StatelessWidget {
-  const _TrainingHud({required this.game});
-
-  final CajuPlaygroundGame game;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: ValueListenableBuilder<double>(
-                valueListenable: game.playerHealthRatioNotifier,
-                builder: (context, ratio, _) {
-                  final clamped = ratio.clamp(0.0, 1.0);
-                  final life = game.playerHealth.round();
-                  return _GaugeBar(
-                    label: 'Sua Vida',
-                    ratio: clamped,
-                    valueLabel: '$life/${game.maxHealth.round()}',
-                    foreground: const Color(0xFF6fd08b),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: ValueListenableBuilder<double>(
-                valueListenable: game.energyRatioNotifier,
-                builder: (context, ratio, _) {
-                  final clamped = ratio.clamp(0.0, 1.0);
-                  final energy = game.currentEnergy.floor();
-                  return _GaugeBar(
-                    label: 'Energia',
-                    ratio: clamped,
-                    valueLabel: '$energy/${game.maxEnergy.floor()}',
-                    foreground: const Color(0xFF42c2ff),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: ValueListenableBuilder<double>(
-                valueListenable: game.opponentHealthRatioNotifier,
-                builder: (context, ratio, _) {
-                  final clamped = ratio.clamp(0.0, 1.0);
-                  final life = game.opponentHealth.round();
-                  return _GaugeBar(
-                    label: 'Vida do Bot',
-                    ratio: clamped,
-                    valueLabel: '$life/${game.maxHealth.round()}',
-                    foreground: const Color(0xFFe66464),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _GaugeBar extends StatelessWidget {
-  const _GaugeBar({
-    required this.label,
-    required this.ratio,
-    required this.valueLabel,
-    required this.foreground,
-  });
-
-  final String label;
-  final double ratio;
-  final String valueLabel;
-  final Color foreground;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
-          label,
+          'Pratique suas estratégias contra um bot local sem gastar energia!',
           textAlign: TextAlign.center,
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: 'VT323',
-            fontSize: 24,
-            color: Colors.white,
+            fontSize: 26,
+            color: Colors.white.withOpacity(0.9),
           ),
         ),
-        const SizedBox(height: 6),
-        Container(
-          height: 18,
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.18),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: FractionallySizedBox(
-            alignment: Alignment.centerLeft,
-            widthFactor: ratio.clamp(0.0, 1.0),
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [foreground.withOpacity(0.9), foreground],
-                ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 16),
         Text(
-          valueLabel,
+          'Monte combinações, teste cartas e descubra novos biomas antes de desafiar outros jogadores.',
           textAlign: TextAlign.center,
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: 'VT323',
             fontSize: 22,
-            color: Colors.white,
+            color: Colors.white.withOpacity(0.85),
           ),
         ),
+        const SizedBox(height: 32),
+        GestureDetector(
+          onTap: isLoading ? null : onLaunch,
+          child: Opacity(
+            opacity: isLoading ? 0.6 : 1,
+            child: Image.asset('assets/images/buttonBattle.png', width: 420),
+          ),
+        ),
+        if (isLoading) ...[
+          const SizedBox(height: 24),
+          const CircularProgressIndicator(color: Colors.white),
+          const SizedBox(height: 12),
+          Text(
+            'Preparando arena de treino...',
+            style: TextStyle(
+              fontFamily: 'VT323',
+              fontSize: 22,
+              color: Colors.white.withOpacity(0.8),
+            ),
+          ),
+        ],
       ],
     );
   }
