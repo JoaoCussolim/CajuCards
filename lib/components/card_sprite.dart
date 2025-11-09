@@ -68,14 +68,21 @@ class CardSprite extends PositionComponent with TapCallbacks {
   @override
   void onTapUp(TapUpEvent event) {
     super.onTapUp(event);
-    
-    if (game.currentEnergy >= card.chestnutCost) {
-      game.currentEnergy -= card.chestnutCost;
 
-      print('Invocando: ${card.name}');
-      game.spawnCreatureAndAttack(card);
-    } else {
+    if (game.currentEnergy < card.chestnutCost) {
       print('Energia insuficiente para: ${card.name}');
+      return;
     }
+
+    if (!game.canSummonCreatureWithSynergy(card.synergy)) {
+      print(
+          'Limite de sinergias atingido. Não é possível invocar ${card.name}.');
+      return;
+    }
+
+    game.currentEnergy -= card.chestnutCost;
+
+    print('Invocando: ${card.name}');
+    game.spawnCreatureAndAttack(card);
   }
 }

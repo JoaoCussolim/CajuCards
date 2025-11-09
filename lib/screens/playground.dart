@@ -65,7 +65,6 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
       ValueNotifier<List<card_model.Card>>([]);
   final int shopSize = 3;
   Enemy? enemy;
-  List<card_model.Card> _allCards = [];
 
   @override
   Color backgroundColor() => const Color(0xFF2a2e42);
@@ -239,6 +238,7 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
           2
       ..anchor = Anchor.center;
 
+    _trackCreature(creature, cardData.synergy);
     add(creature);
 
     final pause = MoveEffect.by(
@@ -270,6 +270,13 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     ]);
 
     creature.add(sequence);
+  }
+
+  void _trackCreature(CreatureSprite creature, String synergy) {
+    _creaturesInField[creature] = synergy;
+    creature.onRemovedCallback = () {
+      _creaturesInField.remove(creature);
+    };
   }
 }
 
