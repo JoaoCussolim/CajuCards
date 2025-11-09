@@ -11,6 +11,179 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:cajucards/models/card.dart' as card_model;
 
+class SpellEffect {
+  final Vector2 center;
+  final double radius;
+  final int damage;
+
+  const SpellEffect({
+    required this.center,
+    required this.radius,
+    required this.damage,
+  });
+
+  List<TroopComponent> apply(Iterable<TroopComponent> candidates) {
+    final affected = <TroopComponent>[];
+    for (final troop in candidates) {
+      if (troop.isRemoved || troop.isDying || troop.isDead) {
+        continue;
+      }
+      if (troop.position.distanceTo(center) <= radius) {
+        troop.receiveDamage(damage.toDouble());
+        affected.add(troop);
+      }
+    }
+    return affected;
+  }
+}
+
+class TroopComponent extends CreatureSprite {
+  TroopComponent({
+    required card_model.TroopCard cardData,
+    required this.isOpponent,
+    double? attackRange,
+    double? attackCooldown,
+  })  : currentHp = cardData.health.toDouble(),
+        attackRange = attackRange ?? 160,
+        attackCooldown = attackCooldown ?? 1.0,
+        super(cardData: cardData);
+
+  final bool isOpponent;
+  final double attackRange;
+  final double attackCooldown;
+  double currentHp;
+  TroopComponent? currentTarget;
+
+  double _cooldownTimer = 0;
+  bool isDying = false;
+
+  bool get isDead => currentHp <= 0;
+
+  void tick(double dt, Iterable<TroopComponent> enemies) {
+    if (isRemoved || isDying || isDead) {
+      return;
+    }
+
+    _cooldownTimer = math.max(0, _cooldownTimer - dt);
+
+    if (currentTarget == null ||
+        currentTarget!.isRemoved ||
+        currentTarget!.isDying ||
+        currentTarget!.isDead ||
+        position.distanceTo(currentTarget!.position) > attackRange) {
+      currentTarget = _findClosestTarget(enemies);
+    }
+
+    if (currentTarget == null) {
+      return;
+    }
+
+    if (_cooldownTimer <= 0 &&
+        position.distanceTo(currentTarget!.position) <= attackRange) {
+      performAttack();
+    }
+  }
+
+  void performAttack() {
+    final target = currentTarget;
+    if (target == null || target.isDead || target.isDying) {
+      return;
+    }
+
+    _cooldownTimer = attackCooldown;
+    target.receiveDamage(cardData.damage.toDouble());
+    _playAttackAnimation(target);
+  }
+
+  void receiveDamage(double amount) {
+    if (isDying || isRemoved) {
+      return;
+    }
+
+    currentHp -= amount;
+    if (currentHp <= 0) {
+      currentHp = 0;
+      _handleDeath();
+    } else {
+      _playHitAnimation();
+    }
+  }
+
+  TroopComponent? _findClosestTarget(Iterable<TroopComponent> enemies) {
+    TroopComponent? closest;
+    var closestDistance = double.infinity;
+    for (final candidate in enemies) {
+      if (candidate == this ||
+          candidate.isRemoved ||
+          candidate.isDying ||
+          candidate.isDead) {
+        continue;
+      }
+      final distance = position.distanceTo(candidate.position);
+      if (distance < closestDistance) {
+        closest = candidate;
+        closestDistance = distance;
+      }
+    }
+    return closest;
+  }
+
+  void _playAttackAnimation(TroopComponent target) {
+    final direction = target.position - position;
+    if (direction.length2 == 0) {
+      return;
+    }
+    direction.normalize();
+    final offset = direction.scaled(14);
+
+    final attackSequence = SequenceEffect([
+      MoveEffect.by(
+        offset,
+        EffectController(duration: 0.08),
+      ),
+      MoveEffect.by(
+        -offset,
+        EffectController(duration: 0.12),
+      ),
+    ]);
+
+    add(attackSequence);
+  }
+
+  void _playHitAnimation() {
+    add(
+      SequenceEffect([
+        OpacityEffect.to(
+          0.4,
+          EffectController(duration: 0.05),
+        ),
+        OpacityEffect.to(
+          1.0,
+          EffectController(duration: 0.1),
+        ),
+      ]),
+    );
+  }
+
+  void _handleDeath() {
+    if (isDying) {
+      return;
+    }
+    isDying = true;
+    currentTarget = null;
+
+    add(
+      SequenceEffect([
+        ScaleEffect.to(
+          Vector2.zero(),
+          EffectController(duration: 0.2, curve: Curves.easeIn),
+        ),
+        RemoveEffect(),
+      ]),
+    );
+  }
+}
+
 class TowerComponent extends RectangleComponent {
   TowerComponent({
     required Vector2 size,
@@ -68,12 +241,15 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
   final int shopSize = 3;
   Enemy? enemy;
 
-  final Map<CreatureSprite, card_model.TroopCard> _creaturesInField = {};
+  final Map<TroopComponent, card_model.TroopCard> _creaturesInField = {};
+  final Map<TroopComponent, card_model.TroopCard> _opponentTroops = {};
   List<card_model.Card> _allCards = [];
+  final math.Random _random = math.Random();
+  BotController? _botController;
 
   String? get activeBackgroundSynergy => backgroundSynergyNotifier.value;
 
-  Map<CreatureSprite, card_model.TroopCard> get creaturesInField =>
+  Map<TroopComponent, card_model.TroopCard> get creaturesInField =>
       Map.unmodifiable(_creaturesInField);
 
   Set<String> get activeSynergies =>
@@ -82,13 +258,13 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
   bool canSummonCreatureWithSynergy(String synergy) {
     final currentSynergies = activeSynergies;
 
-    if (currentSynergies.contains(synergy)) {
-      return true;
-    }
-
     final backgroundSynergy = backgroundSynergyNotifier.value;
 
-    if (backgroundSynergy != null && backgroundSynergy == synergy) {
+    if (backgroundSynergy != null) {
+      return backgroundSynergy == synergy;
+    }
+
+    if (currentSynergies.contains(synergy)) {
       return true;
     }
 
@@ -150,6 +326,10 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
       print("--- ERRO AO CARREGAR CARTAS DA API ---");
       print(e);
       print(stackTrace);
+    }
+
+    if (_allCards.isNotEmpty) {
+      _botController = BotController(game: this);
     }
   }
 
@@ -241,6 +421,9 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     matchTimerText.text = 'Tempo: ${matchTimeSeconds.toStringAsFixed(1)}s';
     energyText.text = 'Energia: ${currentEnergy.floor()}/${maxEnergy.floor()}';
     energyRatioNotifier.value = currentEnergy / maxEnergy;
+
+    _updateBattlefield(dt);
+    _botController?.update(dt);
   }
 
   @override
@@ -287,49 +470,119 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     energyRatioNotifier.value = currentEnergy / maxEnergy;
   }
 
-  void spawnCreatureAndAttack(card_model.TroopCard cardData) {
-    if (enemy == null) return;
+  void spawnCreatureAndAttack(card_model.TroopCard cardData,
+      {Vector2? position}) {
+    final spawnPosition = position ?? _randomPlayerSpawnPosition();
 
-    final creature = CreatureSprite(cardData: cardData)
-      ..position = size / 2
+    final troop = TroopComponent(
+      cardData: cardData,
+      isOpponent: false,
+    )
+      ..position = spawnPosition
       ..anchor = Anchor.center;
 
-    _trackCreature(creature, cardData);
-    add(creature);
-
-    final pause = MoveEffect.by(
-      Vector2.zero(),
-      EffectController(duration: 0.1),
-    );
-
-    const double attackAngle = math.pi / 4;
-    final attack = RotateEffect.to(
-      attackAngle,
-      EffectController(duration: 0.15, reverseDuration: 0.15),
-    );
-
-    final move = MoveEffect.to(
-      enemy!.position,
-      EffectController(duration: 0.5, curve: Curves.easeInOut),
-    );
-
-    final remove = RemoveEffect();
-
-    final sequence = SequenceEffect([pause, attack, move, remove]);
-
-    creature.add(sequence);
+    _trackPlayerTroop(troop, cardData);
+    add(troop);
   }
 
-  void _trackCreature(CreatureSprite creature, card_model.TroopCard card) {
-    _creaturesInField[creature] = card;
-    creature.onRemovedCallback = () {
-      _creaturesInField.remove(creature);
+  void spawnOpponentTroop(card_model.TroopCard cardData, {Vector2? position}) {
+    final spawnPosition = position ?? _randomOpponentSpawnPosition();
+    final troop = TroopComponent(
+      cardData: cardData,
+      isOpponent: true,
+    )
+      ..position = spawnPosition
+      ..anchor = Anchor.center
+      ..flipHorizontally = true;
+
+    _trackOpponentTroop(troop, cardData);
+    add(troop);
+  }
+
+  void _trackPlayerTroop(TroopComponent troop, card_model.TroopCard card) {
+    _creaturesInField[troop] = card;
+    troop.onRemovedCallback = () {
+      _creaturesInField.remove(troop);
     };
   }
 
-  void castSpell(card_model.SpellCard card) {
-    print('Lançando feitiço: ${card.name}');
-    // TODO: implementar efeitos de feitiço conforme necessário.
+  void _trackOpponentTroop(TroopComponent troop, card_model.TroopCard card) {
+    _opponentTroops[troop] = card;
+    troop.onRemovedCallback = () {
+      _opponentTroops.remove(troop);
+    };
+  }
+
+  void castSpell(card_model.SpellCard card,
+      {Vector2? targetPosition, bool byPlayer = true}) {
+    final radius = card.radius ?? 120;
+    final damage = card.damage ?? 25;
+
+    final defaultX = byPlayer ? size.x * 0.75 : size.x * 0.25;
+    final center = targetPosition ?? Vector2(defaultX, size.y / 2);
+
+    final effect = SpellEffect(
+      center: center,
+      radius: radius.toDouble(),
+      damage: damage,
+    );
+
+    final targets = byPlayer ? _opponentTroops.keys : _creaturesInField.keys;
+    final affected = effect.apply(targets);
+
+    _animateSpell(effect, affected);
+  }
+
+  Vector2 _randomPlayerSpawnPosition() {
+    final horizontal = size.x * (0.15 + _random.nextDouble() * 0.2);
+    final vertical = size.y * (0.25 + _random.nextDouble() * 0.5);
+    return Vector2(horizontal, vertical);
+  }
+
+  Vector2 _randomOpponentSpawnPosition() {
+    final horizontal = size.x * (0.65 + _random.nextDouble() * 0.2);
+    final vertical = size.y * (0.25 + _random.nextDouble() * 0.5);
+    return Vector2(horizontal, vertical);
+  }
+
+  void _updateBattlefield(double dt) {
+    final playerTroops = List<TroopComponent>.from(_creaturesInField.keys);
+    final opponentTroops = List<TroopComponent>.from(_opponentTroops.keys);
+
+    for (final troop in playerTroops) {
+      troop.tick(dt, opponentTroops);
+    }
+
+    for (final troop in opponentTroops) {
+      troop.tick(dt, playerTroops);
+    }
+  }
+
+  void _animateSpell(SpellEffect effect, List<TroopComponent> affected) {
+    final color = affected.isEmpty
+        ? Colors.blueAccent.withOpacity(0.3)
+        : Colors.deepOrangeAccent.withOpacity(0.4);
+
+    final spellCircle = CircleComponent(
+      radius: effect.radius,
+      paint: Paint()
+        ..color = color
+        ..style = PaintingStyle.fill,
+    )
+      ..anchor = Anchor.center
+      ..position = effect.center;
+
+    add(spellCircle);
+
+    spellCircle.add(
+      SequenceEffect([
+        OpacityEffect.to(
+          0.0,
+          EffectController(duration: 0.4, curve: Curves.easeOut),
+        ),
+        RemoveEffect(),
+      ]),
+    );
   }
 }
 
@@ -338,6 +591,76 @@ class PlaygroundScreen extends StatefulWidget {
 
   @override
   State<PlaygroundScreen> createState() => _PlaygroundScreenState();
+}
+
+class BotController {
+  BotController({
+    required this.game,
+    this.minDecisionInterval = 3.0,
+    this.maxDecisionInterval = 6.0,
+  }) : _decisionTimer = 0 {
+    _resetTimer();
+  }
+
+  final CajuPlaygroundGame game;
+  final double minDecisionInterval;
+  final double maxDecisionInterval;
+  double _decisionTimer;
+  final math.Random _random = math.Random();
+
+  void update(double dt) {
+    if (game._allCards.isEmpty) {
+      return;
+    }
+
+    _decisionTimer -= dt;
+    if (_decisionTimer > 0) {
+      return;
+    }
+
+    _playRandomCard();
+    _resetTimer();
+  }
+
+  void _resetTimer() {
+    final intervalRange = maxDecisionInterval - minDecisionInterval;
+    _decisionTimer = minDecisionInterval + _random.nextDouble() * intervalRange;
+  }
+
+  void _playRandomCard() {
+    final pool = game.shopCardsNotifier.value.isNotEmpty
+        ? game.shopCardsNotifier.value
+        : game._allCards;
+
+    if (pool.isEmpty) {
+      return;
+    }
+
+    var attempts = 0;
+    while (attempts < 5) {
+      final card = pool[_random.nextInt(pool.length)];
+
+      if (card is card_model.TroopCard) {
+        final position = Vector2(
+          game.size.x * (0.65 + _random.nextDouble() * 0.25),
+          game.size.y * (0.25 + _random.nextDouble() * 0.5),
+        );
+        game.spawnOpponentTroop(card, position: position);
+        return;
+      }
+
+      if (card is card_model.SpellCard) {
+        final position = Vector2(
+          game.size.x * (0.25 + _random.nextDouble() * 0.4),
+          game.size.y * (0.25 + _random.nextDouble() * 0.5),
+        );
+        game.castSpell(card, targetPosition: position, byPlayer: false);
+        return;
+      }
+
+      attempts += 1;
+    }
+  }
 }
 
 class _PlaygroundScreenState extends State<PlaygroundScreen> {
