@@ -29,10 +29,8 @@ class TowerComponent extends RectangleComponent {
 }
 
 class ArenaDivider extends RectangleComponent {
-  ArenaDivider({
-    required Vector2 size,
-    required Vector2 position,
-  }) : super(
+  ArenaDivider({required Vector2 size, required Vector2 position})
+      : super(
           size: size,
           position: position,
           anchor: Anchor.center,
@@ -65,6 +63,30 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
       ValueNotifier<List<card_model.Card>>([]);
   final int shopSize = 3;
   Enemy? enemy;
+
+  final Map<CreatureSprite, String> _creaturesInField = {};
+  String? activeBackgroundSynergy;
+  List<card_model.Card> _allCards = [];
+
+  Map<CreatureSprite, String> get creaturesInField =>
+      Map.unmodifiable(_creaturesInField);
+
+  Set<String> get activeSynergies => _creaturesInField.values.toSet();
+
+  bool canSummonCreatureWithSynergy(String synergy) {
+    final currentSynergies = activeSynergies;
+
+    if (currentSynergies.contains(synergy)) {
+      return true;
+    }
+
+    if (activeBackgroundSynergy != null &&
+        activeBackgroundSynergy == synergy) {
+      return true;
+    }
+
+    return currentSynergies.length < 4;
+  }
 
   @override
   Color backgroundColor() => const Color(0xFF2a2e42);
@@ -99,8 +121,7 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     add(matchTimerText);
 
     enemy = Enemy()
-      ..position =
-          Vector2(size.x / 2, size.y * 0.25)
+      ..position = Vector2(size.x / 2, size.y * 0.25)
       ..anchor = Anchor.center;
     add(enemy!);
 
@@ -130,39 +151,49 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
 
     final groundSprite = await Sprite.load('assets/images/WoodBasic.png');
 
-    add(SpriteComponent(
-      sprite: groundSprite,
-      size: Vector2(size.x / 2, size.y),
-      position: Vector2.zero(),
-      anchor: Anchor.topLeft,
-    ));
+    add(
+      SpriteComponent(
+        sprite: groundSprite,
+        size: Vector2(size.x / 2, size.y),
+        position: Vector2.zero(),
+        anchor: Anchor.topLeft,
+      ),
+    );
 
-    add(SpriteComponent(
-      sprite: groundSprite,
-      size: Vector2(size.x / 2, size.y),
-      position: Vector2(size.x, 0),
-      anchor: Anchor.topRight,
-    ));
+    add(
+      SpriteComponent(
+        sprite: groundSprite,
+        size: Vector2(size.x / 2, size.y),
+        position: Vector2(size.x, 0),
+        anchor: Anchor.topRight,
+      ),
+    );
 
-    add(ArenaDivider(
-      size: Vector2(size.x * 0.01, dividerHeight),
-      position: Vector2(size.x / 2, size.y / 2),
-    ));
+    add(
+      ArenaDivider(
+        size: Vector2(size.x * 0.01, dividerHeight),
+        position: Vector2(size.x / 2, size.y / 2),
+      ),
+    );
 
     final towerSize = Vector2(size.x * 0.1, size.y * 0.18);
 
-    add(TowerComponent(
-      size: towerSize,
-      position: Vector2(0, size.y / 2),
-      anchor: Anchor.centerLeft,
-    ));
+    add(
+      TowerComponent(
+        size: towerSize,
+        position: Vector2(0, size.y / 2),
+        anchor: Anchor.centerLeft,
+      ),
+    );
 
-    add(TowerComponent(
-      size: towerSize,
-      position: Vector2(size.x, size.y / 2),
-      anchor: Anchor.centerRight,
-      isOpponent: true,
-    ));
+    add(
+      TowerComponent(
+        size: towerSize,
+        position: Vector2(size.x, size.y / 2),
+        anchor: Anchor.centerRight,
+        isOpponent: true,
+      ),
+    );
   }
 
   @override
@@ -194,15 +225,9 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
 
     for (var i = 0; i < handCards.length; i++) {
       final cardData = handCards[i];
-      final cardSprite = CardSprite(
-        card: cardData,
-        game: this,
-      )
+      final cardSprite = CardSprite(card: cardData, game: this)
         ..anchor = Anchor.bottomLeft
-        ..position = Vector2(
-          20 + i * (cardSize.x + 12),
-          size.y - 20,
-        );
+        ..position = Vector2(20 + i * (cardSize.x + 12), size.y - 20);
 
       add(cardSprite);
     }
@@ -214,7 +239,8 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     }
 
     _allCards.shuffle();
-    final selection = _allCards.take(math.min(shopSize, _allCards.length)).toList();
+    final selection =
+        _allCards.take(math.min(shopSize, _allCards.length)).toList();
     shopCardsNotifier.value = selection;
   }
 
@@ -233,9 +259,7 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     if (enemy == null) return;
 
     final creature = CreatureSprite(cardData: cardData)
-      ..position =
-          size /
-          2
+      ..position = size / 2
       ..anchor = Anchor.center;
 
     _trackCreature(creature, cardData.synergy);
@@ -249,10 +273,7 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     const double attackAngle = math.pi / 4;
     final attack = RotateEffect.to(
       attackAngle,
-      EffectController(
-        duration: 0.15,
-        reverseDuration: 0.15,
-      ),
+      EffectController(duration: 0.15, reverseDuration: 0.15),
     );
 
     final move = MoveEffect.to(
@@ -262,12 +283,7 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
 
     final remove = RemoveEffect();
 
-    final sequence = SequenceEffect([
-      pause,
-      attack,
-      move,
-      remove,
-    ]);
+    final sequence = SequenceEffect([pause, attack, move, remove]);
 
     creature.add(sequence);
   }
@@ -319,7 +335,10 @@ class _PlaygroundScreenState extends State<PlaygroundScreen> {
             return Align(
               alignment: Alignment.topCenter,
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 24,
+                  horizontal: 16,
+                ),
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 320),
                   child: ValueListenableBuilder<double>(
@@ -342,7 +361,10 @@ class _PlaygroundScreenState extends State<PlaygroundScreen> {
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(12),
                                   gradient: const LinearGradient(
-                                    colors: [Color(0xFF88e0ef), Color(0xFF42c2ff)],
+                                    colors: [
+                                      Color(0xFF88e0ef),
+                                      Color(0xFF42c2ff),
+                                    ],
                                   ),
                                 ),
                               ),
@@ -411,8 +433,9 @@ class _PlaygroundScreenState extends State<PlaygroundScreen> {
                                 children: [
                                   for (final card in cards)
                                     Padding(
-                                      padding:
-                                          const EdgeInsets.symmetric(vertical: 4),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 4,
+                                      ),
                                       child: Row(
                                         children: [
                                           Expanded(
