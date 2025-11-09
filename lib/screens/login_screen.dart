@@ -97,7 +97,7 @@ class _LoginScreenState extends State<LoginScreen> {
         if (!mounted) return;
         if (socketConnected) {
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const InitialScreen()),
+            MaterialPageRoute(builder: (_) => const PlaygroundScreen()),
           );
         } else {
           // A conexão do socket falhou (provavelmente token nulo ou timeout)

@@ -46,7 +46,7 @@ class Enemy extends SpriteComponent {
   @override
   Future<void> onLoad() async {
     super.onLoad();
-    sprite = await Sprite.load('assets/images/sprites/robot.png');
+    sprite = await Sprite.load('images/sprites/robot.png');
   }
 }
 
