@@ -68,15 +68,16 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
   final int shopSize = 3;
   Enemy? enemy;
 
-  final Map<CreatureSprite, String> _creaturesInField = {};
+  final Map<CreatureSprite, card_model.TroopCard> _creaturesInField = {};
   List<card_model.Card> _allCards = [];
 
   String? get activeBackgroundSynergy => backgroundSynergyNotifier.value;
 
-  Map<CreatureSprite, String> get creaturesInField =>
+  Map<CreatureSprite, card_model.TroopCard> get creaturesInField =>
       Map.unmodifiable(_creaturesInField);
 
-  Set<String> get activeSynergies => _creaturesInField.values.toSet();
+  Set<String> get activeSynergies =>
+      _creaturesInField.values.map((card) => card.synergy).toSet();
 
   bool canSummonCreatureWithSynergy(String synergy) {
     final currentSynergies = activeSynergies;
@@ -286,14 +287,14 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     energyRatioNotifier.value = currentEnergy / maxEnergy;
   }
 
-  void spawnCreatureAndAttack(card_model.Card cardData) {
+  void spawnCreatureAndAttack(card_model.TroopCard cardData) {
     if (enemy == null) return;
 
     final creature = CreatureSprite(cardData: cardData)
       ..position = size / 2
       ..anchor = Anchor.center;
 
-    _trackCreature(creature, cardData.synergy);
+    _trackCreature(creature, cardData);
     add(creature);
 
     final pause = MoveEffect.by(
@@ -319,11 +320,16 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     creature.add(sequence);
   }
 
-  void _trackCreature(CreatureSprite creature, String synergy) {
-    _creaturesInField[creature] = synergy;
+  void _trackCreature(CreatureSprite creature, card_model.TroopCard card) {
+    _creaturesInField[creature] = card;
     creature.onRemovedCallback = () {
       _creaturesInField.remove(creature);
     };
+  }
+
+  void castSpell(card_model.SpellCard card) {
+    print('Lançando feitiço: ${card.name}');
+    // TODO: implementar efeitos de feitiço conforme necessário.
   }
 }
 

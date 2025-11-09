@@ -76,22 +76,36 @@ class CardSprite extends PositionComponent with TapCallbacks {
       return;
     }
 
-    if (card.type == 'biome') {
+    if (card is card_model.BiomeCard) {
       game.currentEnergy -= card.chestnutCost;
       unawaited(game.applyBackgroundBiome(card.synergy));
       print('Aplicando bioma: ${card.name}');
       return;
     }
 
-    if (!game.canSummonCreatureWithSynergy(card.synergy)) {
-      print(
-          'Limite de sinergias atingido. Não é possível invocar ${card.name}.');
+    if (card is card_model.SpellCard) {
+      final spellCard = card as card_model.SpellCard;
+      game.currentEnergy -= spellCard.chestnutCost;
+      game.castSpell(spellCard);
       return;
     }
 
-    game.currentEnergy -= card.chestnutCost;
+    if (card is! card_model.TroopCard) {
+      print('Tipo de carta desconhecido: ${card.type}');
+      return;
+    }
 
-    print('Invocando: ${card.name}');
-    game.spawnCreatureAndAttack(card);
+    final troopCard = card as card_model.TroopCard;
+
+    if (!game.canSummonCreatureWithSynergy(troopCard.synergy)) {
+      print(
+          'Limite de sinergias atingido. Não é possível invocar ${troopCard.name}.');
+      return;
+    }
+
+    game.currentEnergy -= troopCard.chestnutCost;
+
+    print('Invocando: ${troopCard.name}');
+    game.spawnCreatureAndAttack(troopCard);
   }
 }

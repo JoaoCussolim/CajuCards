@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:cajucards/models/card.dart' as card_model;
 
 class CreatureSprite extends SpriteComponent {
-  final card_model.Card cardData;
+  final card_model.TroopCard cardData;
   VoidCallback? onRemovedCallback;
 
   CreatureSprite({required this.cardData})
