@@ -58,15 +58,20 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
   late final TextComponent energyText;
   late final TextComponent matchTimerText;
   double matchTimeSeconds = 0;
+  late final SpriteComponent backgroundLayer;
+  late final Sprite _defaultPlayerBackgroundSprite;
   final ValueNotifier<double> energyRatioNotifier = ValueNotifier(0);
   final ValueNotifier<List<card_model.Card>> shopCardsNotifier =
       ValueNotifier<List<card_model.Card>>([]);
+  final ValueNotifier<String?> backgroundSynergyNotifier =
+      ValueNotifier<String?>(null);
   final int shopSize = 3;
   Enemy? enemy;
 
   final Map<CreatureSprite, String> _creaturesInField = {};
-  String? activeBackgroundSynergy;
   List<card_model.Card> _allCards = [];
+
+  String? get activeBackgroundSynergy => backgroundSynergyNotifier.value;
 
   Map<CreatureSprite, String> get creaturesInField =>
       Map.unmodifiable(_creaturesInField);
@@ -80,8 +85,9 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
       return true;
     }
 
-    if (activeBackgroundSynergy != null &&
-        activeBackgroundSynergy == synergy) {
+    final backgroundSynergy = backgroundSynergyNotifier.value;
+
+    if (backgroundSynergy != null && backgroundSynergy == synergy) {
       return true;
     }
 
@@ -151,14 +157,15 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
 
     final groundSprite = await Sprite.load('assets/images/WoodBasic.png');
 
-    add(
-      SpriteComponent(
-        sprite: groundSprite,
-        size: Vector2(size.x / 2, size.y),
-        position: Vector2.zero(),
-        anchor: Anchor.topLeft,
-      ),
+    _defaultPlayerBackgroundSprite = groundSprite;
+    backgroundLayer = SpriteComponent(
+      sprite: _defaultPlayerBackgroundSprite,
+      size: Vector2(size.x / 2, size.y),
+      position: Vector2.zero(),
+      anchor: Anchor.topLeft,
     );
+
+    add(backgroundLayer);
 
     add(
       SpriteComponent(
@@ -196,6 +203,29 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     );
   }
 
+  Future<void> applyBackgroundBiome(String synergy) async {
+    if (activeBackgroundSynergy == synergy) {
+      return;
+    }
+
+    final spritePath = 'images/sprites/background/$synergy.png';
+
+    try {
+      final newSprite = await loadSprite(spritePath);
+      backgroundLayer.sprite = newSprite;
+      backgroundSynergyNotifier.value = synergy;
+    } catch (error, stackTrace) {
+      print('Não foi possível carregar o bioma "$synergy" ($spritePath).');
+      print(error);
+      print(stackTrace);
+    }
+  }
+
+  void resetBackgroundBiome() {
+    backgroundLayer.sprite = _defaultPlayerBackgroundSprite;
+    backgroundSynergyNotifier.value = null;
+  }
+
   @override
   void update(double dt) {
     super.update(dt);
@@ -216,6 +246,7 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
   void onRemove() {
     energyRatioNotifier.dispose();
     shopCardsNotifier.dispose();
+    backgroundSynergyNotifier.dispose();
     super.onRemove();
   }
 

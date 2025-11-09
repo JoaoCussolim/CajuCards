@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flutter/material.dart';
@@ -71,6 +73,13 @@ class CardSprite extends PositionComponent with TapCallbacks {
 
     if (game.currentEnergy < card.chestnutCost) {
       print('Energia insuficiente para: ${card.name}');
+      return;
+    }
+
+    if (card.type == 'biome') {
+      game.currentEnergy -= card.chestnutCost;
+      unawaited(game.applyBackgroundBiome(card.synergy));
+      print('Aplicando bioma: ${card.name}');
       return;
     }
 
