@@ -11,6 +11,7 @@ import 'package:flame/components.dart';
 import 'package:flame/effects.dart';
 import 'package:flame/events.dart';
 import 'package:flame/game.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 class SpellEffect {
@@ -243,30 +244,54 @@ class TroopComponent extends CreatureSprite {
   }
 }
 
-class TowerComponent extends SpriteComponent {
+class TowerComponent extends PositionComponent {
   TowerComponent({
-    required Sprite sprite,
+    required Sprite? sprite,
     required Vector2 size,
     required Vector2 position,
     required Anchor anchor,
     this.isOpponent = false,
-  }) : super(
-         sprite: sprite,
-         size: size,
-         position: position,
-         anchor: anchor,
-         priority: 50,
-       );
+  })  : _sprite = sprite,
+        super(
+          size: size,
+          position: position,
+          anchor: anchor,
+          priority: 50,
+        );
 
+  final Sprite? _sprite;
   final bool isOpponent;
 
   @override
   Future<void> onLoad() async {
     await super.onLoad();
-    // Se quiser espelhar a torre do oponente (caso o sprite peça)
-    if (isOpponent) {
-      flipHorizontally();
+
+    if (_sprite != null) {
+      final spriteComponent = SpriteComponent(
+        sprite: _sprite!,
+        size: size,
+        anchor: Anchor.center,
+        position: size / 2,
+      );
+
+      if (isOpponent) {
+        spriteComponent.flipHorizontally();
+      }
+
+      add(spriteComponent);
+      return;
     }
+
+    add(
+      RectangleComponent(
+        size: size,
+        position: size / 2,
+        anchor: Anchor.center,
+        paint: Paint()
+          ..color = const Color(0xFF8d99ae)
+          ..style = PaintingStyle.fill,
+      ),
+    );
   }
 }
 
@@ -404,26 +429,46 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
   Future<void> _buildArena() async {
     final dividerHeight = size.y * 0.82;
 
-    final groundSprite = await Sprite.load('assets/images/WoodBasic.png');
-    final towerSprite = await Sprite.load('assets/images/sprites/tower.png');
+    final groundSprite = await _loadSpriteOrNull('assets/images/WoodBasic.png');
+    final towerSprite = await _loadSpriteOrNull('assets/images/sprites/tower.png');
 
-    add(
-      SpriteComponent(
-        sprite: groundSprite,
-        size: Vector2(size.x / 2, size.y),
-        position: Vector2.zero(),
-        anchor: Anchor.topLeft,
-      ),
-    );
+    if (groundSprite != null) {
+      add(
+        SpriteComponent(
+          sprite: groundSprite,
+          size: Vector2(size.x / 2, size.y),
+          position: Vector2.zero(),
+          anchor: Anchor.topLeft,
+        ),
+      );
 
-    add(
-      SpriteComponent(
-        sprite: groundSprite,
-        size: Vector2(size.x / 2, size.y),
-        position: Vector2(size.x, 0),
-        anchor: Anchor.topRight,
-      ),
-    );
+      add(
+        SpriteComponent(
+          sprite: groundSprite,
+          size: Vector2(size.x / 2, size.y),
+          position: Vector2(size.x, 0),
+          anchor: Anchor.topRight,
+        ),
+      );
+    } else {
+      const fallbackColor = Color(0xFF1f2338);
+      add(
+        RectangleComponent(
+          size: Vector2(size.x / 2, size.y),
+          position: Vector2.zero(),
+          anchor: Anchor.topLeft,
+          paint: Paint()..color = fallbackColor,
+        ),
+      );
+      add(
+        RectangleComponent(
+          size: Vector2(size.x / 2, size.y),
+          position: Vector2(size.x, 0),
+          anchor: Anchor.topRight,
+          paint: Paint()..color = fallbackColor,
+        ),
+      );
+    }
 
     final battlefieldSurface = RectangleComponent(
       size: Vector2(size.x * 0.86, size.y * 0.64),
@@ -505,6 +550,16 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
           36,
       opponentTowerComponent.position.y,
     );
+  }
+
+  Future<Sprite?> _loadSpriteOrNull(String assetPath) async {
+    try {
+      return await Sprite.load(assetPath);
+    } catch (error, stackTrace) {
+      debugPrint('Falha ao carregar sprite "$assetPath": $error');
+      debugPrint('$stackTrace');
+      return null;
+    }
   }
 
   @override

@@ -9,6 +9,22 @@ import 'package:flutter/material.dart';
 
 final Vector2 cardSize = Vector2(100, 140);
 
+String _resolveSpriteAssetPath(String rawPath) {
+  if (rawPath.startsWith('assets/')) {
+    return rawPath;
+  }
+  if (rawPath.startsWith('images/')) {
+    return 'assets/$rawPath';
+  }
+  if (rawPath.startsWith('sprites/')) {
+    return 'assets/images/$rawPath';
+  }
+  if (!rawPath.contains('/')) {
+    return 'assets/images/sprites/$rawPath';
+  }
+  return 'assets/images/$rawPath';
+}
+
 class CardSprite extends PositionComponent with TapCallbacks {
   final card_model.Card card;
   final CajuPlaygroundGame game;
@@ -23,10 +39,12 @@ class CardSprite extends PositionComponent with TapCallbacks {
   Future<void> onLoad() async {
     super.onLoad();
 
-    const basePath = 'images/sprites';
-    final backgroundPath = '$basePath/background/${card.synergy}.png';
-    final borderPath = '$basePath/border/${card.rarity}.png';
-    final characterPath = '$basePath/${card.spritePath}';
+    const basePath = 'sprites';
+    final backgroundPath =
+        _resolveSpriteAssetPath('$basePath/background/${card.synergy}.png');
+    final borderPath =
+        _resolveSpriteAssetPath('$basePath/border/${card.rarity}.png');
+    final characterPath = _resolveSpriteAssetPath(card.spritePath);
 
     final backgroundSprite = await _loadSpriteOrNull(backgroundPath);
     final borderSprite = await _loadSpriteOrNull(borderPath);
