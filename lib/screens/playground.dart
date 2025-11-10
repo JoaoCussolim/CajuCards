@@ -47,11 +47,11 @@ class TroopComponent extends CreatureSprite {
     double? attackRange,
     double? attackCooldown,
     double? moveSpeed,
-  })  : currentHp = cardData.health.toDouble(),
-        attackRange = attackRange ?? 140,
-        attackCooldown = attackCooldown ?? 0.9,
-        moveSpeed = moveSpeed ?? 80,
-        super(cardData: cardData);
+  }) : currentHp = cardData.health.toDouble(),
+       attackRange = attackRange ?? 140,
+       attackCooldown = attackCooldown ?? 0.9,
+       moveSpeed = moveSpeed ?? 80,
+       super(cardData: cardData);
 
   final CajuPlaygroundGame game;
   final bool isOpponent;
@@ -117,8 +117,11 @@ class TroopComponent extends CreatureSprite {
     currentTarget = _findClosestTarget(enemies);
   }
 
-  void _moveTowards(Vector2 destination, double dt,
-      {bool clampToLane = false}) {
+  void _moveTowards(
+    Vector2 destination,
+    double dt, {
+    bool clampToLane = false,
+  }) {
     final delta = destination - position;
     if (delta.length2 == 0) {
       return;
@@ -136,7 +139,8 @@ class TroopComponent extends CreatureSprite {
       if (laneDelta.abs() <= 1.5) {
         position.y = laneY;
       } else {
-        final correction = laneDelta.sign * math.min(laneDelta.abs(), moveSpeed * 0.45 * dt);
+        final correction =
+            laneDelta.sign * math.min(laneDelta.abs(), moveSpeed * 0.45 * dt);
         position.y += correction;
       }
     }
@@ -213,14 +217,8 @@ class TroopComponent extends CreatureSprite {
   void _playHitAnimation() {
     add(
       SequenceEffect([
-        OpacityEffect.to(
-          0.4,
-          EffectController(duration: 0.05),
-        ),
-        OpacityEffect.to(
-          1.0,
-          EffectController(duration: 0.1),
-        ),
+        OpacityEffect.to(0.4, EffectController(duration: 0.05)),
+        OpacityEffect.to(1.0, EffectController(duration: 0.1)),
       ]),
     );
   }
@@ -244,38 +242,48 @@ class TroopComponent extends CreatureSprite {
   }
 }
 
-class TowerComponent extends RectangleComponent {
+class TowerComponent extends SpriteComponent {
   TowerComponent({
+    required Sprite sprite,
     required Vector2 size,
     required Vector2 position,
     required Anchor anchor,
-    bool isOpponent = false,
+    this.isOpponent = false,
   }) : super(
-          size: size,
-          position: position,
-          anchor: anchor,
-          paint: Paint()
-            ..color = isOpponent
-                ? const Color(0xFFc34a36)
-                : const Color(0xFF3fc380),
-        );
+         sprite: sprite,
+         size: size,
+         position: position,
+         anchor: anchor,
+         priority: 50,
+       );
+
+  final bool isOpponent;
+
+  @override
+  Future<void> onLoad() async {
+    await super.onLoad();
+    // Se quiser espelhar a torre do oponente (caso o sprite peça)
+    if (isOpponent) {
+      flipHorizontally();
+    }
+  }
 }
 
 class ArenaDivider extends RectangleComponent {
   ArenaDivider({required Vector2 size, required Vector2 position})
-      : super(
-          size: size,
-          position: position,
-          anchor: Anchor.center,
-          paint: Paint()..color = Colors.white.withOpacity(0.22),
-        );
+    : super(
+        size: size,
+        position: position,
+        anchor: Anchor.center,
+        paint: Paint()..color = Colors.white.withOpacity(0.22),
+      );
 }
 
 class CajuPlaygroundGame extends FlameGame with TapCallbacks {
   static const double handBottomInset = 80;
 
   CajuPlaygroundGame({this.socketService, this.isBotMode = false})
-      : _simulationRunning = false;
+    : _simulationRunning = false;
 
   CajuPlaygroundGame.bot() : this(isBotMode: true);
 
@@ -297,12 +305,14 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
       ValueNotifier<List<card_model.Card>>([]);
   final ValueNotifier<String?> backgroundSynergyNotifier =
       ValueNotifier<String?>(null);
-  final ValueNotifier<double> playerHealthRatioNotifier =
-      ValueNotifier<double>(1);
+  final ValueNotifier<double> playerHealthRatioNotifier = ValueNotifier<double>(
+    1,
+  );
   final ValueNotifier<double> opponentHealthRatioNotifier =
       ValueNotifier<double>(1);
-  final ValueNotifier<bool> simulationRunningNotifier =
-      ValueNotifier<bool>(false);
+  final ValueNotifier<bool> simulationRunningNotifier = ValueNotifier<bool>(
+    false,
+  );
   final ValueNotifier<bool> readinessNotifier = ValueNotifier<bool>(false);
   final int shopSize = 3;
   late final TowerComponent playerTowerComponent;
@@ -397,6 +407,7 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     final dividerHeight = size.y * 0.82;
 
     final groundSprite = await Sprite.load('assets/images/WoodBasic.png');
+    final towerSprite = await Sprite.load('images/sprites/tower.png');
 
     _defaultPlayerBackgroundSprite = groundSprite;
     backgroundLayer = SpriteComponent(
@@ -467,20 +478,25 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     final towerSize = Vector2(size.x * 0.1, size.y * 0.18);
 
     playerTowerComponent = TowerComponent(
+      sprite: towerSprite,
       size: towerSize,
       position: Vector2(0, size.y / 2),
       anchor: Anchor.centerLeft,
+      isOpponent: false,
     );
     add(playerTowerComponent);
 
+    // Torre do oponente (direita)
     opponentTowerComponent = TowerComponent(
+      sprite: towerSprite,
       size: towerSize,
       position: Vector2(size.x, size.y / 2),
       anchor: Anchor.centerRight,
-      isOpponent: true,
+      isOpponent: true, // espelha horizontalmente (se desejado)
     );
     add(opponentTowerComponent);
 
+    // Pontos “front” permanecem iguais
     playerTowerFront = Vector2(
       playerTowerComponent.position.x + playerTowerComponent.size.x / 2 + 36,
       playerTowerComponent.position.y,
@@ -608,7 +624,9 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
   }
 
   void _animateTowerHit({required bool onOpponentSide}) {
-    final tower = onOpponentSide ? opponentTowerComponent : playerTowerComponent;
+    final tower = onOpponentSide
+        ? opponentTowerComponent
+        : playerTowerComponent;
     if (tower.isRemoved) {
       return;
     }
@@ -666,8 +684,9 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     }
 
     _allCards.shuffle();
-    final selection =
-        _allCards.take(math.min(shopSize, _allCards.length)).toList();
+    final selection = _allCards
+        .take(math.min(shopSize, _allCards.length))
+        .toList();
     shopCardsNotifier.value = selection;
   }
 
@@ -685,14 +704,15 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     final laneY = _pickLaneY();
     final spawnPosition = _playerSpawnPoint(laneY);
 
-    final troop = TroopComponent(
-      game: this,
-      cardData: cardData,
-      isOpponent: false,
-      laneY: laneY,
-    )
-      ..position = spawnPosition
-      ..anchor = Anchor.center;
+    final troop =
+        TroopComponent(
+            game: this,
+            cardData: cardData,
+            isOpponent: false,
+            laneY: laneY,
+          )
+          ..position = spawnPosition
+          ..anchor = Anchor.center;
 
     _trackPlayerTroop(troop, cardData);
     add(troop);
@@ -702,15 +722,16 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     final laneY = _pickLaneY();
     final spawnPosition = _opponentSpawnPoint(laneY);
 
-    final troop = TroopComponent(
-      game: this,
-      cardData: cardData,
-      isOpponent: true,
-      laneY: laneY,
-    )
-      ..position = spawnPosition
-      ..anchor = Anchor.center
-      ..flipHorizontally();
+    final troop =
+        TroopComponent(
+            game: this,
+            cardData: cardData,
+            isOpponent: true,
+            laneY: laneY,
+          )
+          ..position = spawnPosition
+          ..anchor = Anchor.center
+          ..flipHorizontally();
 
     _trackOpponentTroop(troop, cardData);
     add(troop);
@@ -730,8 +751,11 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     };
   }
 
-  void castSpell(card_model.SpellCard card,
-      {Vector2? targetPosition, bool byPlayer = true}) {
+  void castSpell(
+    card_model.SpellCard card, {
+    Vector2? targetPosition,
+    bool byPlayer = true,
+  }) {
     final radius = card.radius ?? 120;
     final damage = card.damage ?? 25;
 
@@ -849,20 +873,24 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     }
   }
 
-  Future<void> _animateSpell(SpellEffect effect, List<TroopComponent> affected,
-      card_model.SpellCard card) async {
+  Future<void> _animateSpell(
+    SpellEffect effect,
+    List<TroopComponent> affected,
+    card_model.SpellCard card,
+  ) async {
     final color = affected.isEmpty
         ? Colors.blueAccent.withOpacity(0.3)
         : Colors.deepOrangeAccent.withOpacity(0.4);
 
-    final spellCircle = CircleComponent(
-      radius: effect.radius,
-      paint: Paint()
-        ..color = color
-        ..style = PaintingStyle.fill,
-    )
-      ..anchor = Anchor.center
-      ..position = effect.center;
+    final spellCircle =
+        CircleComponent(
+            radius: effect.radius,
+            paint: Paint()
+              ..color = color
+              ..style = PaintingStyle.fill,
+          )
+          ..anchor = Anchor.center
+          ..position = effect.center;
 
     void addCirclePulse() {
       add(spellCircle);
@@ -892,15 +920,19 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
       return;
     }
 
-    final dropStart = Vector2(effect.center.x, effect.center.y - effect.radius * 2.2);
-    final dropComponent = SpriteComponent(
-      sprite: sprite,
-      size: Vector2.all(effect.radius * 1.8),
-      anchor: Anchor.center,
-      position: dropStart,
-    )
-      ..priority = 60
-      ..opacity = 0.0;
+    final dropStart = Vector2(
+      effect.center.x,
+      effect.center.y - effect.radius * 2.2,
+    );
+    final dropComponent =
+        SpriteComponent(
+            sprite: sprite,
+            size: Vector2.all(effect.radius * 1.8),
+            anchor: Anchor.center,
+            position: dropStart,
+          )
+          ..priority = 60
+          ..opacity = 0.0;
 
     add(dropComponent);
 
