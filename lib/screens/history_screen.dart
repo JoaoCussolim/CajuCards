@@ -142,21 +142,7 @@ class _MatchHistoryList extends StatelessWidget {
       itemCount: 3,
       itemBuilder: (context, index) {
         final List<Map<String, dynamic>> matchData = [
-          {
-            'opponent': 'OdiadorDoMiguel',
-            'result': 'Derrota',
-            'date': '22/09/2025',
-          },
-          {
-            'opponent': 'GostadorDoMiguel',
-            'result': 'Vitória',
-            'date': '22/09/2025',
-          },
-          {
-            'opponent': 'OfficialClashRoyale',
-            'result': 'Vitória',
-            'date': '22/09/2025',
-          },
+    
         ];
 
         return Padding(
