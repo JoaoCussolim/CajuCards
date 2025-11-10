@@ -14,7 +14,7 @@ void main() async {
 
   await Supabase.initialize(
     url: 'https://gvlcgmozoqjkcexcchrn.supabase.co',
-    anonKey: 'sb_publishable_FNhzHMG2L1Yu0gFGa5YI6w_ 7xkJgqnd',
+    anonKey: 'sb_publishable_FNhzHMG2L1Yu0gFGa5YI6w_7xkJgqnd',
   );
 
   final ApiClient apiClient = ApiClient();
