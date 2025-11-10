@@ -36,6 +36,8 @@ class _MatchmakingScreenState extends State<MatchmakingScreen>
 
   Timer? _fallbackToBotTimer;
   bool _navigatedToMatch = false;
+  late SocketService _socketService;
+  bool _socketServiceInitialized = false;
 
   @override
   void initState() {
@@ -83,23 +85,28 @@ class _MatchmakingScreenState extends State<MatchmakingScreen>
   }
 
   @override
-  void dispose() {
-    // --- LÓGICA DE CANCELAMENTO ADICIONADA ---
-    // Se o usuário sair desta tela (ex: apertar "Voltar")
-    // E ele ainda estiver procurando, cancele a busca!
-    
-    // Usamos 'context.read' porque estamos no dispose
-    final socketService = context.read<SocketService>();
-    if (socketService.status == MatchmakingStatus.searching) {
-      socketService.cancelFindMatch(); //
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_socketServiceInitialized) {
+      _socketService = context.read<SocketService>();
+      _socketServiceInitialized = true;
     }
-    // --- FIM DA LÓGICA ---
+  }
+
+  @override
+  void dispose() {
+    final shouldCancelMatchmaking =
+        _socketService.status == MatchmakingStatus.searching;
 
     _pulsarController.dispose();
     _dotsTimer?.cancel();
     _phrasesTimer?.cancel();
     _fallbackToBotTimer?.cancel();
     super.dispose();
+
+    if (shouldCancelMatchmaking) {
+      _socketService.cancelFindMatch(shouldNotifyListeners: false);
+    }
   }
 
   void _startFallbackTimer() {
@@ -108,8 +115,7 @@ class _MatchmakingScreenState extends State<MatchmakingScreen>
       if (!mounted) {
         return;
       }
-      final socketService = context.read<SocketService>();
-      if (socketService.status == MatchmakingStatus.searching) {
+      if (_socketService.status == MatchmakingStatus.searching) {
         _navigateToBattle(vsBot: true);
       }
     });
@@ -123,9 +129,8 @@ class _MatchmakingScreenState extends State<MatchmakingScreen>
     _navigatedToMatch = true;
     _fallbackToBotTimer?.cancel();
 
-    final socketService = context.read<SocketService>();
-    if (vsBot && socketService.status == MatchmakingStatus.searching) {
-      socketService.cancelFindMatch();
+    if (vsBot && _socketService.status == MatchmakingStatus.searching) {
+      _socketService.cancelFindMatch();
     }
 
     Navigator.pushReplacement(

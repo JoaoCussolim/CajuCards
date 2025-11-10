@@ -171,11 +171,13 @@ class SocketService with ChangeNotifier {
 
 
   /// Sai da fila de matchmaking.
-  void cancelFindMatch() {
+  void cancelFindMatch({bool shouldNotifyListeners = true}) {
     if (_socket?.connected ?? false) {
       _socket!.emit('cancelFindMatch');
       _status = MatchmakingStatus.idle;
-      notifyListeners();
+      if (shouldNotifyListeners) {
+        notifyListeners();
+      }
     }
   }
 
