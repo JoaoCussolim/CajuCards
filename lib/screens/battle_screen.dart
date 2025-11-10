@@ -1,18 +1,46 @@
 import 'package:cajucards/screens/matchmaking_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart'; // Importe o provider
-import 'package:cajucards/providers/player_provider.dart'; // Importe seu provider
+import 'package:provider/provider.dart';
+import 'package:cajucards/providers/player_provider.dart';
 import 'package:cajucards/models/player.dart';
 import 'shop_screen.dart';
 import 'history_screen.dart';
-
-// --- ADICIONADO ---
-// Importe o SocketService para que possamos chamá-lo
 import 'package:cajucards/api/services/socket_service.dart';
-// --- FIM DA ADIÇÃO ---
 
-class BattleScreen extends StatelessWidget {
+class BattleScreen extends StatefulWidget {
   const BattleScreen({super.key});
+
+  @override
+  State<BattleScreen> createState() => _BattleScreenState();
+}
+
+class _BattleScreenState extends State<BattleScreen> {
+  bool _launchingMatch = false;
+
+  void _onTapBattle() {
+    if (_launchingMatch) {
+      return;
+    }
+
+    setState(() {
+      _launchingMatch = true;
+    });
+
+    _startMatchmaking();
+  }
+
+  void _startMatchmaking() {
+    final socketService = context.read<SocketService>();
+    socketService.findMatch();
+    Navigator.pushReplacement(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) => const MatchmakingScreen(),
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -102,7 +130,6 @@ class BattleScreen extends StatelessWidget {
               horizontal: 24.0,
             ),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
@@ -113,14 +140,47 @@ class BattleScreen extends StatelessWidget {
                         coins: player.cashewCoins,
                       ),
                     ),
-                    const SizedBox(width: 20),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 6.0),
-                      child: Image.asset('assets/images/Gear.png', width: 120),
-                    ),
                   ],
                 ),
-                const _StartButton(),
+                const SizedBox(height: 32),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Encontre uma partida online. Caso nenhum oponente seja encontrado, um bot assumirá o duelo automaticamente.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: 'VT323',
+                          fontSize: 26,
+                          color: Colors.white.withOpacity(0.9),
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      GestureDetector(
+                        onTap: _launchingMatch ? null : _onTapBattle,
+                        child: Opacity(
+                          opacity: _launchingMatch ? 0.7 : 1,
+                          child: Image.asset('assets/images/buttonBattle.png', width: 520),
+                        ),
+                      ),
+                      if (_launchingMatch) ...[
+                        const SizedBox(height: 24),
+                        const CircularProgressIndicator(color: Colors.white),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Abrindo matchmaking...',
+                          style: TextStyle(
+                            fontFamily: 'VT323',
+                            fontSize: 22,
+                            color: Colors.white.withOpacity(0.85),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
                 const _BottomNavBar(),
               ],
             ),
@@ -178,41 +238,6 @@ class _TopBar extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _StartButton extends StatelessWidget {
-  const _StartButton();
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      // --- INÍCIO DA ALTERAÇÃO LÓGICA ---
-      onTap: () {
-        // 1. Pega o SocketService (sem escutar)
-        final socketService = context.read<SocketService>();
-
-        // 2. Inicia a busca pela partida
-        socketService.findMatch();
-        debugPrint(
-            "BattleScreen: Chamando findMatch() e navegando para Matchmaking...");
-
-        // 3. Navega para a tela de Matchmaking (como você já fazia)
-        Navigator.pushReplacement(
-          context,
-          PageRouteBuilder(
-            pageBuilder: (_, __, ___) => const MatchmakingScreen(),
-            transitionDuration: Duration.zero,
-            reverseTransitionDuration: Duration.zero,
-          ),
-        );
-      },
-      // --- FIM DA ALTERAÇÃO LÓGICA ---
-      child: Stack(
-        alignment: Alignment.center,
-        children: [Image.asset('assets/images/buttonBattle.png', width: 600)],
       ),
     );
   }
