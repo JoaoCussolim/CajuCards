@@ -272,6 +272,8 @@ class ArenaDivider extends RectangleComponent {
 }
 
 class CajuPlaygroundGame extends FlameGame with TapCallbacks {
+  static const double handBottomInset = 80;
+
   CajuPlaygroundGame({this.socketService, this.isBotMode = false})
       : _simulationRunning = false;
 
@@ -286,12 +288,11 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
   double currentEnergy = 0.0;
   final double maxEnergy = 10.0;
   final double energyPerSecond = 1.0;
-  late final TextComponent energyText;
-  late final TextComponent matchTimerText;
   double matchTimeSeconds = 0;
   late final SpriteComponent backgroundLayer;
   late final Sprite _defaultPlayerBackgroundSprite;
   final ValueNotifier<double> energyRatioNotifier = ValueNotifier(0);
+  final ValueNotifier<double> matchTimeNotifier = ValueNotifier<double>(0);
   final ValueNotifier<List<card_model.Card>> shopCardsNotifier =
       ValueNotifier<List<card_model.Card>>([]);
   final ValueNotifier<String?> backgroundSynergyNotifier =
@@ -357,29 +358,6 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     super.onLoad();
 
     await _buildArena();
-
-    final textStyle = TextPaint(
-      style: const TextStyle(
-        fontFamily: 'VT323',
-        fontSize: 24,
-        color: Colors.white,
-      ),
-    );
-    energyText = TextComponent(
-      text: 'Energia: 0/10',
-      textRenderer: textStyle,
-      position: Vector2(size.x - 20, 20),
-      anchor: Anchor.topRight,
-    );
-    add(energyText);
-
-    matchTimerText = TextComponent(
-      text: 'Tempo: 0.0s',
-      textRenderer: textStyle,
-      position: Vector2(size.x / 2, size.y * 0.1),
-      anchor: Anchor.topCenter,
-    );
-    add(matchTimerText);
 
     final cardService = CardService(ApiClient());
 
@@ -553,8 +531,7 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
       }
     }
     matchTimeSeconds += dt;
-    matchTimerText.text = 'Tempo: ${matchTimeSeconds.toStringAsFixed(1)}s';
-    energyText.text = 'Energia: ${currentEnergy.floor()}/${maxEnergy.floor()}';
+    matchTimeNotifier.value = matchTimeSeconds;
     energyRatioNotifier.value = currentEnergy / maxEnergy;
 
     _updateBattlefield(dt);
@@ -564,6 +541,7 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
   @override
   void onRemove() {
     energyRatioNotifier.dispose();
+    matchTimeNotifier.dispose();
     shopCardsNotifier.dispose();
     backgroundSynergyNotifier.dispose();
     playerHealthRatioNotifier.dispose();
@@ -603,9 +581,8 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     matchTimeSeconds = 0;
     playerHealth = maxHealth;
     opponentHealth = maxHealth;
-    energyText.text = 'Energia: 0/${maxEnergy.floor()}';
-    matchTimerText.text = 'Tempo: 0.0s';
     energyRatioNotifier.value = 0;
+    matchTimeNotifier.value = 0;
     playerHealthRatioNotifier.value = 1;
     opponentHealthRatioNotifier.value = 1;
     _clearBattlefield();
@@ -674,7 +651,10 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
       final cardData = handCards[i];
       final cardSprite = CardSprite(card: cardData, game: this)
         ..anchor = Anchor.bottomLeft
-        ..position = Vector2(20 + i * (cardSize.x + 12), size.y - 20);
+        ..position = Vector2(
+          20 + i * (cardSize.x + 12),
+          size.y - handBottomInset,
+        );
 
       add(cardSprite);
     }
@@ -698,7 +678,6 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
 
     currentEnergy -= 1;
     _populateShop();
-    energyText.text = 'Energia: ${currentEnergy.floor()}/${maxEnergy.floor()}';
     energyRatioNotifier.value = currentEnergy / maxEnergy;
   }
 
@@ -794,7 +773,7 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
       return false;
     }
 
-    final handThreshold = size.y - cardSize.y - 24;
+    final handThreshold = size.y - handBottomInset - cardSize.y - 4;
     if (position.y >= handThreshold) {
       return false;
     }
@@ -808,7 +787,6 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     castSpell(pending, targetPosition: position, byPlayer: true);
     _clearSpellSelection();
 
-    energyText.text = 'Energia: ${currentEnergy.floor()}/${maxEnergy.floor()}';
     energyRatioNotifier.value = currentEnergy / maxEnergy;
 
     return true;
