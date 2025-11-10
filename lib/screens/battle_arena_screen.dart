@@ -124,6 +124,19 @@ class _BattleArenaScreenState extends State<BattleArenaScreen> {
                 ],
               ),
             ),
+            ValueListenableBuilder<BattleOutcome?>(
+              valueListenable: _game.outcomeNotifier,
+              builder: (context, outcome, _) {
+                if (outcome == null) {
+                  return const SizedBox.shrink();
+                }
+
+                return _BattleOutcomeOverlay(
+                  outcome: outcome,
+                  onExit: _leaveToLobby,
+                );
+              },
+            ),
           ],
         ),
       ),
@@ -496,6 +509,86 @@ class _ShopPanel extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BattleOutcomeOverlay extends StatelessWidget {
+  const _BattleOutcomeOverlay({
+    required this.outcome,
+    required this.onExit,
+  });
+
+  final BattleOutcome outcome;
+  final VoidCallback onExit;
+
+  @override
+  Widget build(BuildContext context) {
+    final isVictory = outcome == BattleOutcome.victory;
+    final bannerAsset =
+        isVictory ? 'assets/images/victory.png' : 'assets/images/defeat.png';
+    final title = isVictory ? 'Vitória!' : 'Derrota';
+    final description = isVictory
+        ? 'Sua tropa destruiu a torre adversária.'
+        : 'Sua torre foi destruída. Tente novamente!';
+
+    return Container(
+      color: Colors.black.withOpacity(0.78),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset(bannerAsset, width: 220),
+              const SizedBox(height: 24),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontFamily: 'VT323',
+                  fontSize: 52,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                description,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: 'VT323',
+                  fontSize: 24,
+                  color: Colors.white.withOpacity(0.92),
+                ),
+              ),
+              const SizedBox(height: 32),
+              GestureDetector(
+                onTap: onExit,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 60,
+                    vertical: 14,
+                  ),
+                  decoration: const BoxDecoration(
+                    image: DecorationImage(
+                      image: AssetImage('assets/images/button.png'),
+                      fit: BoxFit.fill,
+                    ),
+                  ),
+                  child: const Text(
+                    'Voltar ao menu',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontFamily: 'VT323',
+                      fontSize: 28,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),

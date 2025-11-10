@@ -14,6 +14,8 @@ import 'package:flame/game.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+enum BattleOutcome { victory, defeat }
+
 class SpellEffect {
   final Vector2 center;
   final double radius;
@@ -336,6 +338,8 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     false,
   );
   final ValueNotifier<bool> readinessNotifier = ValueNotifier<bool>(false);
+  final ValueNotifier<BattleOutcome?> outcomeNotifier =
+      ValueNotifier<BattleOutcome?>(null);
   final int shopSize = 3;
   late final TowerComponent playerTowerComponent;
   late final TowerComponent opponentTowerComponent;
@@ -347,6 +351,7 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
   final Map<TroopComponent, card_model.TroopCard> _creaturesInField = {};
   final Map<TroopComponent, card_model.TroopCard> _opponentTroops = {};
   List<card_model.Card> _allCards = [];
+  List<card_model.TroopCard> _botTroopDeck = [];
   final math.Random _random = math.Random();
   BotController? _botController;
   card_model.SpellCard? _pendingSpellCard;
@@ -399,21 +404,27 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
         final removed = fetchedCards.length - _allCards.length;
         print('Descartando $removed cartas de bioma.');
       }
-
-      if (_allCards.isEmpty) {
-        print("Nenhuma carta jogável encontrada na API.");
-      } else {
-        _dealHandCards();
-        _populateShop();
-      }
     } catch (e, stackTrace) {
       print("--- ERRO AO CARREGAR CARTAS DA API ---");
       print(e);
       print(stackTrace);
     }
 
-    if (_allCards.isNotEmpty) {
-      _botController = BotController(game: this);
+    _ensureMinimumCardPool();
+    _prepareBotDeck();
+
+    if (_allCards.isEmpty) {
+      print("Nenhuma carta jogável disponível. Utilizando baralho padrão.");
+    } else {
+      _dealHandCards();
+      _populateShop();
+    }
+
+    if (isBotMode && _botTroopDeck.isNotEmpty) {
+      _botController = BotController(
+        game: this,
+        troopDeck: _botTroopDeck,
+      );
     }
 
     _initialized = true;
@@ -593,6 +604,7 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     opponentHealthRatioNotifier.dispose();
     simulationRunningNotifier.dispose();
     readinessNotifier.dispose();
+    outcomeNotifier.dispose();
     super.onRemove();
   }
 
@@ -606,12 +618,15 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     _botController?.reset();
   }
 
-  void stopSimulation() {
+  void stopSimulation({BattleOutcome? outcome}) {
     if (!_initialized || !_simulationRunning) {
       return;
     }
     _simulationRunning = false;
     simulationRunningNotifier.value = false;
+    if (outcome != null && outcomeNotifier.value == null) {
+      outcomeNotifier.value = outcome;
+    }
   }
 
   void resetSimulation() {
@@ -630,6 +645,7 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     matchTimeNotifier.value = 0;
     playerHealthRatioNotifier.value = 1;
     opponentHealthRatioNotifier.value = 1;
+    outcomeNotifier.value = null;
     _clearBattlefield();
     _populateShop();
     _botController?.reset();
@@ -687,6 +703,100 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
       troop.removeFromParent();
     }
     _opponentTroops.clear();
+  }
+
+  void _ensureMinimumCardPool() {
+    final fallback = _fallbackCards();
+
+    if (_allCards.isEmpty) {
+      _allCards = List<card_model.Card>.from(fallback);
+      return;
+    }
+
+    final existingIds = _allCards.map((card) => card.id).toSet();
+
+    final troopCount =
+        _allCards.whereType<card_model.TroopCard>().length;
+    var neededTroops = 2 - troopCount;
+    if (neededTroops > 0) {
+      for (final troop in fallback.whereType<card_model.TroopCard>()) {
+        if (neededTroops <= 0) {
+          break;
+        }
+        if (existingIds.add(troop.id)) {
+          _allCards.add(troop);
+          neededTroops -= 1;
+        }
+      }
+    }
+
+    final hasSpell = _allCards.any((card) => card is card_model.SpellCard);
+    if (!hasSpell) {
+      for (final spell in fallback.whereType<card_model.SpellCard>()) {
+        if (existingIds.add(spell.id)) {
+          _allCards.add(spell);
+        }
+        break;
+      }
+    }
+  }
+
+  void _prepareBotDeck() {
+    final troops = _allCards
+        .whereType<card_model.TroopCard>()
+        .toList(growable: false);
+
+    if (troops.isEmpty) {
+      _botTroopDeck = [];
+      return;
+    }
+
+    final sortedTroops = List<card_model.TroopCard>.from(troops)
+      ..sort((a, b) => a.chestnutCost.compareTo(b.chestnutCost));
+
+    if (sortedTroops.length == 1) {
+      sortedTroops.add(sortedTroops.first);
+    }
+
+    _botTroopDeck = sortedTroops.take(2).toList(growable: false);
+  }
+
+  List<card_model.Card> _fallbackCards() {
+    return [
+      card_model.TroopCard(
+        id: 'fallback_robot',
+        name: 'Robô Guerreiro',
+        description: 'Avança sem parar para proteger a torre.',
+        synergy: 'Futuristic',
+        rarity: 'Mercury',
+        chestnutCost: 3,
+        spritePath: 'sprites/robot.png',
+        health: 280,
+        damage: 32,
+      ),
+      card_model.TroopCard(
+        id: 'fallback_gigantossaur',
+        name: 'Gigantossauro',
+        description: 'Criatura colossal focada em dano corpo a corpo.',
+        synergy: 'Primordial',
+        rarity: 'Plutonium',
+        chestnutCost: 5,
+        spritePath: 'sprites/gigantossaur.png',
+        health: 420,
+        damage: 48,
+      ),
+      card_model.SpellCard(
+        id: 'fallback_meteor',
+        name: 'Meteoro',
+        description: 'Invoca um meteoro que causa dano em área.',
+        synergy: 'Cosmic',
+        rarity: 'Uranium',
+        chestnutCost: 4,
+        spritePath: 'sprites/meteor.png',
+        radius: 120,
+        damage: 45,
+      ),
+    ];
   }
 
   void _dealHandCards() {
@@ -897,7 +1007,9 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     }
 
     if (playerHealth <= 0 || opponentHealth <= 0) {
-      stopSimulation();
+      final outcome =
+          opponentHealth <= 0 ? BattleOutcome.victory : BattleOutcome.defeat;
+      stopSimulation(outcome: outcome);
     }
   }
 
@@ -1015,24 +1127,28 @@ class PlaygroundScreen extends StatefulWidget {
 class BotController {
   BotController({
     required this.game,
+    required List<card_model.TroopCard> troopDeck,
     this.minDecisionInterval = 3.0,
-    this.maxDecisionInterval = 6.0,
-  }) : _decisionTimer = 0 {
+    this.maxDecisionInterval = 5.0,
+  })  : _troopDeck = List<card_model.TroopCard>.from(troopDeck),
+        _decisionTimer = 0 {
     _resetTimer();
   }
 
   final CajuPlaygroundGame game;
   final double minDecisionInterval;
   final double maxDecisionInterval;
+  final List<card_model.TroopCard> _troopDeck;
   double _decisionTimer;
+  int _nextTroopIndex = 0;
   final math.Random _random = math.Random();
 
   void update(double dt) {
-    if (!game._simulationRunning) {
+    if (!game.isSimulationRunning || _troopDeck.isEmpty) {
       return;
     }
 
-    if (game._allCards.isEmpty) {
+    if (game.outcomeNotifier.value != null) {
       return;
     }
 
@@ -1041,49 +1157,26 @@ class BotController {
       return;
     }
 
-    _playRandomCard();
+    _deployTroop();
     _resetTimer();
   }
 
   void reset() {
     _decisionTimer = 0;
+    _nextTroopIndex = 0;
     _resetTimer();
   }
 
   void _resetTimer() {
-    final intervalRange = maxDecisionInterval - minDecisionInterval;
-    _decisionTimer = minDecisionInterval + _random.nextDouble() * intervalRange;
+    final intervalRange = math.max(0, maxDecisionInterval - minDecisionInterval);
+    final jitter = intervalRange == 0 ? 0 : _random.nextDouble() * intervalRange;
+    _decisionTimer = minDecisionInterval + jitter;
   }
 
-  void _playRandomCard() {
-    final pool = game.shopCardsNotifier.value.isNotEmpty
-        ? game.shopCardsNotifier.value
-        : game._allCards;
-
-    if (pool.isEmpty) {
-      return;
-    }
-
-    var attempts = 0;
-    while (attempts < 5) {
-      final card = pool[_random.nextInt(pool.length)];
-
-      if (card is card_model.TroopCard) {
-        game.spawnOpponentTroop(card);
-        return;
-      }
-
-      if (card is card_model.SpellCard) {
-        final position = Vector2(
-          game.size.x * (0.25 + _random.nextDouble() * 0.4),
-          game.size.y * (0.25 + _random.nextDouble() * 0.5),
-        );
-        game.castSpell(card, targetPosition: position, byPlayer: false);
-        return;
-      }
-
-      attempts += 1;
-    }
+  void _deployTroop() {
+    final card = _troopDeck[_nextTroopIndex % _troopDeck.length];
+    _nextTroopIndex = (_nextTroopIndex + 1) % _troopDeck.length;
+    game.spawnOpponentTroop(card);
   }
 }
 

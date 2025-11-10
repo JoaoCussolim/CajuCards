@@ -164,6 +164,8 @@ class CardSprite extends PositionComponent with TapCallbacks {
 
     print('Invocando: ${troopCard.name}');
     game.spawnCreatureAndAttack(troopCard);
+    game.energyRatioNotifier.value = game.currentEnergy / game.maxEnergy;
+    event.handled = true;
   }
 
   void setSelected(bool selected) {
