@@ -80,8 +80,6 @@ class _MatchmakingScreenState extends State<MatchmakingScreen>
     // O Future.delayed de 10 segundos foi removido.
     // A navegação agora é controlada pelo Consumer no método build().
     // --- FIM DA REMOÇÃO ---
-
-    _startFallbackTimer();
   }
 
   @override
@@ -90,12 +88,13 @@ class _MatchmakingScreenState extends State<MatchmakingScreen>
     if (!_socketServiceInitialized) {
       _socketService = context.read<SocketService>();
       _socketServiceInitialized = true;
+      _startFallbackTimer();
     }
   }
 
   @override
   void dispose() {
-    final shouldCancelMatchmaking =
+    final shouldCancelMatchmaking = _socketServiceInitialized &&
         _socketService.status == MatchmakingStatus.searching;
 
     _pulsarController.dispose();
@@ -115,7 +114,8 @@ class _MatchmakingScreenState extends State<MatchmakingScreen>
       if (!mounted) {
         return;
       }
-      if (_socketService.status == MatchmakingStatus.searching) {
+      if (_socketServiceInitialized &&
+          _socketService.status == MatchmakingStatus.searching) {
         _navigateToBattle(vsBot: true);
       }
     });
@@ -129,14 +129,25 @@ class _MatchmakingScreenState extends State<MatchmakingScreen>
     _navigatedToMatch = true;
     _fallbackToBotTimer?.cancel();
 
-    if (vsBot && _socketService.status == MatchmakingStatus.searching) {
-      _socketService.cancelFindMatch();
+    Widget targetScreen;
+    if (vsBot) {
+      if (_socketServiceInitialized &&
+          _socketService.status == MatchmakingStatus.searching) {
+        _socketService.cancelFindMatch();
+      }
+      targetScreen = BattleArenaScreen.bot();
+    } else {
+      if (!_socketServiceInitialized) {
+        // Sem serviço não há como iniciar a partida online, então não navega.
+        return;
+      }
+      targetScreen = BattleArenaScreen.online(socketService: _socketService);
     }
 
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
-        pageBuilder: (_, __, ___) => BattleArenaScreen.bot(),
+        pageBuilder: (_, __, ___) => targetScreen,
         transitionDuration: Duration.zero,
         reverseTransitionDuration: Duration.zero,
       ),

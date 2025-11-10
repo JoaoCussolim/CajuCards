@@ -1,3 +1,4 @@
+import 'package:cajucards/api/services/socket_service.dart';
 import 'package:cajucards/components/card_sprite.dart';
 import 'package:cajucards/models/card.dart' as card_model;
 import 'package:flame/game.dart';
@@ -18,6 +19,16 @@ class BattleArenaScreen extends StatefulWidget {
     );
   }
 
+  factory BattleArenaScreen.online({
+    Key? key,
+    required SocketService socketService,
+  }) {
+    return BattleArenaScreen._(
+      gameBuilder: () => CajuPlaygroundGame(socketService: socketService),
+      key: key,
+    );
+  }
+
   final CajuPlaygroundGame Function() _gameBuilder;
 
   @override
@@ -33,6 +44,7 @@ class _BattleArenaScreenState extends State<BattleArenaScreen> {
     super.initState();
     _game = widget._gameBuilder();
     _game.readinessNotifier.addListener(_handleReadinessChange);
+    _handleReadinessChange();
   }
 
   void _handleReadinessChange() {
