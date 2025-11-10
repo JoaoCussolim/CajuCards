@@ -984,78 +984,64 @@ class PlaygroundScreen extends StatefulWidget {
   State<PlaygroundScreen> createState() => _PlaygroundScreenState();
 }
 
+class _ScheduledPlay {
+  const _ScheduledPlay({
+    required this.timeOffset,
+    required this.card,
+  });
+
+  final double timeOffset;
+  final card_model.TroopCard card;
+}
+
 class BotController {
   BotController({
     required this.game,
-    this.minDecisionInterval = 3.0,
-    this.maxDecisionInterval = 6.0,
-  }) : _decisionTimer = 0 {
-    _resetTimer();
+  })  : _schedule = [],
+        _elapsedTime = 0,
+        _nextPlayIndex = 0 {
+    _initializeSchedule();
   }
 
   final CajuPlaygroundGame game;
-  final double minDecisionInterval;
-  final double maxDecisionInterval;
-  double _decisionTimer;
-  final math.Random _random = math.Random();
+  final List<_ScheduledPlay> _schedule;
+  double _elapsedTime;
+  int _nextPlayIndex;
 
   void update(double dt) {
-    if (!game._simulationRunning) {
+    if (!game._simulationRunning || _schedule.isEmpty) {
       return;
     }
 
-    if (game._allCards.isEmpty) {
-      return;
-    }
+    _elapsedTime += dt;
 
-    _decisionTimer -= dt;
-    if (_decisionTimer > 0) {
-      return;
+    while (_nextPlayIndex < _schedule.length &&
+        _elapsedTime >= _schedule[_nextPlayIndex].timeOffset) {
+      final play = _schedule[_nextPlayIndex];
+      game.spawnOpponentTroop(play.card);
+      _nextPlayIndex += 1;
     }
-
-    _playRandomCard();
-    _resetTimer();
   }
 
   void reset() {
-    _decisionTimer = 0;
-    _resetTimer();
+    _elapsedTime = 0;
+    _nextPlayIndex = 0;
   }
 
-  void _resetTimer() {
-    final intervalRange = maxDecisionInterval - minDecisionInterval;
-    _decisionTimer = minDecisionInterval + _random.nextDouble() * intervalRange;
-  }
+  void _initializeSchedule() {
+    final troopCards =
+        game._allCards.whereType<card_model.TroopCard>().toList();
 
-  void _playRandomCard() {
-    final pool = game.shopCardsNotifier.value.isNotEmpty
-        ? game.shopCardsNotifier.value
-        : game._allCards;
-
-    if (pool.isEmpty) {
+    if (troopCards.length < 2) {
       return;
     }
 
-    var attempts = 0;
-    while (attempts < 5) {
-      final card = pool[_random.nextInt(pool.length)];
-
-      if (card is card_model.TroopCard) {
-        game.spawnOpponentTroop(card);
-        return;
-      }
-
-      if (card is card_model.SpellCard) {
-        final position = Vector2(
-          game.size.x * (0.25 + _random.nextDouble() * 0.4),
-          game.size.y * (0.25 + _random.nextDouble() * 0.5),
-        );
-        game.castSpell(card, targetPosition: position, byPlayer: false);
-        return;
-      }
-
-      attempts += 1;
-    }
+    _schedule
+      ..clear()
+      ..addAll([
+        _ScheduledPlay(timeOffset: 3.0, card: troopCards[0]),
+        _ScheduledPlay(timeOffset: 9.0, card: troopCards[1]),
+      ]);
   }
 }
 
