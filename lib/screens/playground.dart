@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:cajucards/api/api_client.dart';
 import 'package:cajucards/api/services/card_service.dart';
@@ -315,6 +316,8 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
   List<card_model.Card> _allCards = [];
   final math.Random _random = math.Random();
   BotController? _botController;
+  card_model.SpellCard? _pendingSpellCard;
+  CardSprite? _pendingSpellSprite;
 
   String? get activeBackgroundSynergy => backgroundSynergyNotifier.value;
   bool get isSimulationRunning => _simulationRunning;
@@ -574,6 +577,7 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     if (!_initialized || _simulationRunning) {
       return;
     }
+    _clearSpellSelection();
     _simulationRunning = true;
     simulationRunningNotifier.value = true;
     _botController?.reset();
@@ -593,6 +597,7 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     }
 
     stopSimulation();
+    _clearSpellSelection();
 
     currentEnergy = 0;
     matchTimeSeconds = 0;
@@ -763,7 +768,69 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     final targets = byPlayer ? _opponentTroops.keys : _creaturesInField.keys;
     final affected = effect.apply(targets);
 
-    _animateSpell(effect, affected);
+    unawaited(_animateSpell(effect, affected, card));
+  }
+
+  void prepareSpell(card_model.SpellCard card, CardSprite sprite) {
+    if (_pendingSpellSprite == sprite) {
+      _clearSpellSelection();
+      return;
+    }
+
+    if (currentEnergy < card.chestnutCost) {
+      print('Energia insuficiente para: ${card.name}');
+      return;
+    }
+
+    _clearSpellSelection();
+    _pendingSpellCard = card;
+    _pendingSpellSprite = sprite;
+    sprite.setSelected(true);
+  }
+
+  bool tryCastSelectedSpellAt(Vector2 position) {
+    final pending = _pendingSpellCard;
+    if (pending == null) {
+      return false;
+    }
+
+    final handThreshold = size.y - cardSize.y - 24;
+    if (position.y >= handThreshold) {
+      return false;
+    }
+
+    if (currentEnergy < pending.chestnutCost) {
+      print('Energia insuficiente para: ${pending.name}');
+      return false;
+    }
+
+    currentEnergy -= pending.chestnutCost;
+    castSpell(pending, targetPosition: position, byPlayer: true);
+    _clearSpellSelection();
+
+    energyText.text = 'Energia: ${currentEnergy.floor()}/${maxEnergy.floor()}';
+    energyRatioNotifier.value = currentEnergy / maxEnergy;
+
+    return true;
+  }
+
+  void _clearSpellSelection() {
+    _pendingSpellSprite?.setSelected(false);
+    _pendingSpellCard = null;
+    _pendingSpellSprite = null;
+  }
+
+  @override
+  void onTapUp(TapUpEvent event) {
+    super.onTapUp(event);
+
+    if (event.handled) {
+      return;
+    }
+
+    if (tryCastSelectedSpellAt(event.localPosition)) {
+      event.handled = true;
+    }
   }
 
   double _pickLaneY() {
@@ -804,7 +871,8 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     }
   }
 
-  void _animateSpell(SpellEffect effect, List<TroopComponent> affected) {
+  Future<void> _animateSpell(SpellEffect effect, List<TroopComponent> affected,
+      card_model.SpellCard card) async {
     final color = affected.isEmpty
         ? Colors.blueAccent.withOpacity(0.3)
         : Colors.deepOrangeAccent.withOpacity(0.4);
@@ -818,17 +886,84 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
       ..anchor = Anchor.center
       ..position = effect.center;
 
-    add(spellCircle);
+    void addCirclePulse() {
+      add(spellCircle);
 
-    spellCircle.add(
+      spellCircle.add(
+        SequenceEffect([
+          OpacityEffect.to(
+            0.0,
+            EffectController(duration: 0.4, curve: Curves.easeOut),
+          ),
+          RemoveEffect(),
+        ]),
+      );
+    }
+
+    Sprite? sprite;
+    final spritePath = 'assets/images/sprites/${card.spritePath}';
+    try {
+      sprite = await loadSprite(spritePath);
+    } catch (error) {
+      print('Não foi possível carregar o sprite do feitiço ${card.name}');
+      print(error);
+    }
+
+    if (sprite == null) {
+      addCirclePulse();
+      return;
+    }
+
+    final dropStart = Vector2(effect.center.x, effect.center.y - effect.radius * 2.2);
+    final dropComponent = SpriteComponent(
+      sprite: sprite,
+      size: Vector2.all(effect.radius * 1.8),
+      anchor: Anchor.center,
+      position: dropStart,
+    )
+      ..priority = 60
+      ..opacity = 0.0;
+
+    add(dropComponent);
+
+    dropComponent.add(
       SequenceEffect([
         OpacityEffect.to(
-          0.0,
-          EffectController(duration: 0.4, curve: Curves.easeOut),
+          1.0,
+          EffectController(duration: 0.05, curve: Curves.easeIn),
         ),
-        RemoveEffect(),
+        MoveEffect.to(
+          effect.center,
+          EffectController(duration: 0.32, curve: Curves.easeIn),
+        ),
       ]),
     );
+
+    Future.delayed(const Duration(milliseconds: 370), () {
+      addCirclePulse();
+
+      if (dropComponent.isRemoved) {
+        return;
+      }
+
+      dropComponent.add(
+        SequenceEffect([
+          ScaleEffect.to(
+            Vector2.all(1.15),
+            EffectController(duration: 0.08, curve: Curves.easeOut),
+          ),
+          ScaleEffect.to(
+            Vector2.all(0.7),
+            EffectController(duration: 0.12, curve: Curves.easeIn),
+          ),
+          OpacityEffect.to(
+            0.0,
+            EffectController(duration: 0.18, curve: Curves.easeOut),
+          ),
+          RemoveEffect(),
+        ]),
+      );
+    });
   }
 }
 
