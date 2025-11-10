@@ -360,27 +360,7 @@ class _PvpPanel extends StatelessWidget {
         const SizedBox(height: 32),
         GestureDetector(
           onTap: onStart,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Image.asset('assets/images/buttonBattle.png', width: 520),
-              const Text(
-                'Buscar Partida PvP',
-                style: TextStyle(
-                  fontFamily: 'VT323',
-                  fontSize: 40,
-                  color: Colors.white,
-                  shadows: [
-                    Shadow(
-                      offset: Offset(0, 2),
-                      blurRadius: 6,
-                      color: Colors.black54,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+          child: Image.asset('assets/images/buttonBattle.png', width: 520),
         ),
       ],
     );

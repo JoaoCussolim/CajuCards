@@ -39,18 +39,25 @@ class SpellEffect {
 
 class TroopComponent extends CreatureSprite {
   TroopComponent({
+    required this.game,
     required card_model.TroopCard cardData,
     required this.isOpponent,
+    required this.laneY,
     double? attackRange,
     double? attackCooldown,
+    double? moveSpeed,
   })  : currentHp = cardData.health.toDouble(),
-        attackRange = attackRange ?? 160,
-        attackCooldown = attackCooldown ?? 1.0,
+        attackRange = attackRange ?? 140,
+        attackCooldown = attackCooldown ?? 0.9,
+        moveSpeed = moveSpeed ?? 80,
         super(cardData: cardData);
 
+  final CajuPlaygroundGame game;
   final bool isOpponent;
+  final double laneY;
   final double attackRange;
   final double attackCooldown;
+  final double moveSpeed;
   double currentHp;
   TroopComponent? currentTarget;
 
@@ -59,40 +66,98 @@ class TroopComponent extends CreatureSprite {
 
   bool get isDead => currentHp <= 0;
 
+  Vector2 get _enemyTowerFront =>
+      isOpponent ? game.playerTowerFront : game.opponentTowerFront;
+
   void tick(double dt, Iterable<TroopComponent> enemies) {
     if (isRemoved || isDying || isDead) {
       return;
     }
 
     _cooldownTimer = math.max(0, _cooldownTimer - dt);
+    _refreshTarget(enemies);
 
-    if (currentTarget == null ||
-        currentTarget!.isRemoved ||
-        currentTarget!.isDying ||
-        currentTarget!.isDead ||
-        position.distanceTo(currentTarget!.position) > attackRange) {
-      currentTarget = _findClosestTarget(enemies);
-    }
-
-    if (currentTarget == null) {
+    final target = currentTarget;
+    if (target != null) {
+      final distance = position.distanceTo(target.position);
+      if (distance > attackRange * 0.85) {
+        _moveTowards(target.position, dt);
+      } else if (_cooldownTimer <= 0) {
+        _strikeTroop(target);
+      }
       return;
     }
 
-    if (_cooldownTimer <= 0 &&
-        position.distanceTo(currentTarget!.position) <= attackRange) {
-      performAttack();
+    final towerDestination = Vector2(_enemyTowerFront.x, laneY);
+    final distanceToTower = position.distanceTo(towerDestination);
+    if (distanceToTower > attackRange * 0.9) {
+      _moveTowards(towerDestination, dt, clampToLane: true);
+      return;
+    }
+
+    if (_cooldownTimer <= 0) {
+      _strikeTower();
     }
   }
 
-  void performAttack() {
+  void _refreshTarget(Iterable<TroopComponent> enemies) {
     final target = currentTarget;
-    if (target == null || target.isDead || target.isDying) {
+    final needsNewTarget =
+        target == null ||
+        target.isRemoved ||
+        target.isDying ||
+        target.isDead ||
+        position.distanceTo(target.position) > attackRange;
+
+    if (!needsNewTarget) {
+      return;
+    }
+
+    currentTarget = _findClosestTarget(enemies);
+  }
+
+  void _moveTowards(Vector2 destination, double dt,
+      {bool clampToLane = false}) {
+    final delta = destination - position;
+    if (delta.length2 == 0) {
+      return;
+    }
+
+    final direction = delta.normalized();
+    final maxStep = moveSpeed * dt;
+    final distance = delta.length;
+    final step = math.min(maxStep, distance);
+
+    position += direction * step;
+
+    if (clampToLane) {
+      final laneDelta = laneY - position.y;
+      if (laneDelta.abs() <= 1.5) {
+        position.y = laneY;
+      } else {
+        final correction = laneDelta.sign * math.min(laneDelta.abs(), moveSpeed * 0.45 * dt);
+        position.y += correction;
+      }
+    }
+  }
+
+  void _strikeTroop(TroopComponent target) {
+    if (target.isDead || target.isDying) {
       return;
     }
 
     _cooldownTimer = attackCooldown;
     target.receiveDamage(cardData.damage.toDouble());
-    _playAttackAnimation(target);
+    _playAttackAnimation();
+  }
+
+  void _strikeTower() {
+    _cooldownTimer = attackCooldown;
+    game.applyBaseDamage(
+      toOpponent: !isOpponent,
+      amount: cardData.damage.toDouble(),
+    );
+    _playAttackAnimation();
   }
 
   void receiveDamage(double amount) {
@@ -128,26 +193,20 @@ class TroopComponent extends CreatureSprite {
     return closest;
   }
 
-  void _playAttackAnimation(TroopComponent target) {
-    final direction = target.position - position;
-    if (direction.length2 == 0) {
-      return;
-    }
-    direction.normalize();
-    final offset = direction.scaled(14);
-
-    final attackSequence = SequenceEffect([
-      MoveEffect.by(
-        offset,
-        EffectController(duration: 0.08),
-      ),
-      MoveEffect.by(
-        -offset,
-        EffectController(duration: 0.12),
-      ),
-    ]);
-
-    add(attackSequence);
+  void _playAttackAnimation() {
+    final swingAngle = (math.pi / 6) * (isOpponent ? -1 : 1);
+    add(
+      SequenceEffect([
+        RotateEffect.by(
+          swingAngle,
+          EffectController(duration: 0.1, curve: Curves.easeOut),
+        ),
+        RotateEffect.by(
+          -swingAngle,
+          EffectController(duration: 0.12, curve: Curves.easeIn),
+        ),
+      ]),
+    );
   }
 
   void _playHitAnimation() {
@@ -207,18 +266,8 @@ class ArenaDivider extends RectangleComponent {
           size: size,
           position: position,
           anchor: Anchor.center,
-          paint: Paint()..color = Colors.white.withOpacity(0.35),
+          paint: Paint()..color = Colors.white.withOpacity(0.22),
         );
-}
-
-class Enemy extends SpriteComponent {
-  Enemy() : super(size: Vector2.all(80));
-
-  @override
-  Future<void> onLoad() async {
-    super.onLoad();
-    sprite = await Sprite.load('images/sprites/robot.png');
-  }
 }
 
 class CajuPlaygroundGame extends FlameGame with TapCallbacks {
@@ -254,7 +303,12 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
       ValueNotifier<bool>(false);
   final ValueNotifier<bool> readinessNotifier = ValueNotifier<bool>(false);
   final int shopSize = 3;
-  Enemy? enemy;
+  late final TowerComponent playerTowerComponent;
+  late final TowerComponent opponentTowerComponent;
+  late final Vector2 playerTowerFront;
+  late final Vector2 opponentTowerFront;
+  late final List<double> _laneCenters;
+  final double _laneVariance = 22;
 
   final Map<TroopComponent, card_model.TroopCard> _creaturesInField = {};
   final Map<TroopComponent, card_model.TroopCard> _opponentTroops = {};
@@ -324,11 +378,6 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     );
     add(matchTimerText);
 
-    enemy = Enemy()
-      ..position = Vector2(size.x / 2, size.y * 0.25)
-      ..anchor = Anchor.center;
-    add(enemy!);
-
     final cardService = CardService(ApiClient());
 
     try {
@@ -364,7 +413,7 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
   }
 
   Future<void> _buildArena() async {
-    final dividerHeight = size.y * 0.9;
+    final dividerHeight = size.y * 0.82;
 
     final groundSprite = await Sprite.load('assets/images/WoodBasic.png');
 
@@ -375,7 +424,6 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
       position: Vector2.zero(),
       anchor: Anchor.topLeft,
     );
-
     add(backgroundLayer);
 
     add(
@@ -387,30 +435,80 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
       ),
     );
 
+    final battlefieldSurface = RectangleComponent(
+      size: Vector2(size.x * 0.86, size.y * 0.64),
+      position: Vector2(size.x / 2, size.y / 2),
+      anchor: Anchor.center,
+      paint: Paint()..color = const Color(0xFF1f2338).withOpacity(0.9),
+    );
+    add(battlefieldSurface);
+
+    add(
+      RectangleComponent(
+        size: Vector2(size.x * 0.9, size.y * 0.68),
+        position: Vector2(size.x / 2, size.y / 2),
+        anchor: Anchor.center,
+        paint: Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 6
+          ..color = Colors.white.withOpacity(0.08),
+      ),
+    );
+
+    final laneSpacing = size.y * 0.16;
+    final laneHeight = size.y * 0.16;
+    _laneCenters = [];
+
+    for (final offset in [-1, 0, 1]) {
+      final laneY = size.y / 2 + laneSpacing * offset;
+      _laneCenters.add(laneY);
+      final highlightColor = offset == 0
+          ? const Color(0xFF8ad8ff).withOpacity(0.12)
+          : const Color(0xFFf6c372).withOpacity(0.08);
+
+      add(
+        RectangleComponent(
+          size: Vector2(size.x * 0.78, laneHeight),
+          position: Vector2(size.x / 2, laneY),
+          anchor: Anchor.center,
+          paint: Paint()..color = highlightColor,
+        ),
+      );
+    }
+
     add(
       ArenaDivider(
-        size: Vector2(size.x * 0.01, dividerHeight),
+        size: Vector2(size.x * 0.012, dividerHeight),
         position: Vector2(size.x / 2, size.y / 2),
       ),
     );
 
     final towerSize = Vector2(size.x * 0.1, size.y * 0.18);
 
-    add(
-      TowerComponent(
-        size: towerSize,
-        position: Vector2(0, size.y / 2),
-        anchor: Anchor.centerLeft,
-      ),
+    playerTowerComponent = TowerComponent(
+      size: towerSize,
+      position: Vector2(0, size.y / 2),
+      anchor: Anchor.centerLeft,
     );
+    add(playerTowerComponent);
 
-    add(
-      TowerComponent(
-        size: towerSize,
-        position: Vector2(size.x, size.y / 2),
-        anchor: Anchor.centerRight,
-        isOpponent: true,
-      ),
+    opponentTowerComponent = TowerComponent(
+      size: towerSize,
+      position: Vector2(size.x, size.y / 2),
+      anchor: Anchor.centerRight,
+      isOpponent: true,
+    );
+    add(opponentTowerComponent);
+
+    playerTowerFront = Vector2(
+      playerTowerComponent.position.x + playerTowerComponent.size.x / 2 + 36,
+      playerTowerComponent.position.y,
+    );
+    opponentTowerFront = Vector2(
+      opponentTowerComponent.position.x -
+          opponentTowerComponent.size.x / 2 -
+          36,
+      opponentTowerComponent.position.y,
     );
   }
 
@@ -519,10 +617,32 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     if (toOpponent) {
       opponentHealth = (opponentHealth - amount).clamp(0, maxHealth);
       opponentHealthRatioNotifier.value = opponentHealth / maxHealth;
+      _animateTowerHit(onOpponentSide: true);
     } else {
       playerHealth = (playerHealth - amount).clamp(0, maxHealth);
       playerHealthRatioNotifier.value = playerHealth / maxHealth;
+      _animateTowerHit(onOpponentSide: false);
     }
+  }
+
+  void _animateTowerHit({required bool onOpponentSide}) {
+    final tower = onOpponentSide ? opponentTowerComponent : playerTowerComponent;
+    if (tower.isRemoved) {
+      return;
+    }
+
+    tower.add(
+      SequenceEffect([
+        OpacityEffect.to(
+          0.65,
+          EffectController(duration: 0.06, curve: Curves.easeOut),
+        ),
+        OpacityEffect.to(
+          1.0,
+          EffectController(duration: 0.14, curve: Curves.easeIn),
+        ),
+      ]),
+    );
   }
 
   void _clearBattlefield() {
@@ -577,13 +697,15 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     energyRatioNotifier.value = currentEnergy / maxEnergy;
   }
 
-  void spawnCreatureAndAttack(card_model.TroopCard cardData,
-      {Vector2? position}) {
-    final spawnPosition = position ?? _randomPlayerSpawnPosition();
+  void spawnCreatureAndAttack(card_model.TroopCard cardData) {
+    final laneY = _pickLaneY();
+    final spawnPosition = _playerSpawnPoint(laneY);
 
     final troop = TroopComponent(
+      game: this,
       cardData: cardData,
       isOpponent: false,
+      laneY: laneY,
     )
       ..position = spawnPosition
       ..anchor = Anchor.center;
@@ -592,11 +714,15 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     add(troop);
   }
 
-  void spawnOpponentTroop(card_model.TroopCard cardData, {Vector2? position}) {
-    final spawnPosition = position ?? _randomOpponentSpawnPosition();
+  void spawnOpponentTroop(card_model.TroopCard cardData) {
+    final laneY = _pickLaneY();
+    final spawnPosition = _opponentSpawnPoint(laneY);
+
     final troop = TroopComponent(
+      game: this,
       cardData: cardData,
       isOpponent: true,
+      laneY: laneY,
     )
       ..position = spawnPosition
       ..anchor = Anchor.center
@@ -640,16 +766,25 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     _animateSpell(effect, affected);
   }
 
-  Vector2 _randomPlayerSpawnPosition() {
-    final horizontal = size.x * (0.15 + _random.nextDouble() * 0.2);
-    final vertical = size.y * (0.25 + _random.nextDouble() * 0.5);
-    return Vector2(horizontal, vertical);
+  double _pickLaneY() {
+    if (_laneCenters.isEmpty) {
+      return size.y / 2;
+    }
+
+    final baseLane = _laneCenters[_random.nextInt(_laneCenters.length)];
+    final jitter = (_random.nextDouble() * 2 - 1) * _laneVariance;
+    final value = (baseLane + jitter).clamp(size.y * 0.2, size.y * 0.8);
+    return value.toDouble();
   }
 
-  Vector2 _randomOpponentSpawnPosition() {
-    final horizontal = size.x * (0.65 + _random.nextDouble() * 0.2);
-    final vertical = size.y * (0.25 + _random.nextDouble() * 0.5);
-    return Vector2(horizontal, vertical);
+  Vector2 _playerSpawnPoint(double laneY) {
+    final offset = 18 + _random.nextDouble() * 22;
+    return Vector2(playerTowerFront.x - offset, laneY);
+  }
+
+  Vector2 _opponentSpawnPoint(double laneY) {
+    final offset = 18 + _random.nextDouble() * 22;
+    return Vector2(opponentTowerFront.x + offset, laneY);
   }
 
   void _updateBattlefield(double dt) {
@@ -662,6 +797,10 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
 
     for (final troop in opponentTroops) {
       troop.tick(dt, playerTroops);
+    }
+
+    if (playerHealth <= 0 || opponentHealth <= 0) {
+      stopSimulation();
     }
   }
 
@@ -757,11 +896,7 @@ class BotController {
       final card = pool[_random.nextInt(pool.length)];
 
       if (card is card_model.TroopCard) {
-        final position = Vector2(
-          game.size.x * (0.65 + _random.nextDouble() * 0.25),
-          game.size.y * (0.25 + _random.nextDouble() * 0.5),
-        );
-        game.spawnOpponentTroop(card, position: position);
+        game.spawnOpponentTroop(card);
         return;
       }
 
