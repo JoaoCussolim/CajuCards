@@ -171,10 +171,25 @@ class SocketService with ChangeNotifier {
 
 
   /// Sai da fila de matchmaking.
-  void cancelFindMatch() {
+  void cancelFindMatch({bool shouldNotifyListeners = true}) {
     if (_socket?.connected ?? false) {
       _socket!.emit('cancelFindMatch');
       _status = MatchmakingStatus.idle;
+      if (shouldNotifyListeners) {
+        notifyListeners();
+      }
+    }
+  }
+
+  /// Finaliza uma partida em andamento e retorna ao estado ocioso.
+  void leaveCurrentMatch() {
+    if (_socket?.connected ?? false) {
+      _socket!.emit('leaveMatch');
+    }
+
+    if (_status != MatchmakingStatus.idle) {
+      _status = MatchmakingStatus.idle;
+      _gameState = null;
       notifyListeners();
     }
   }

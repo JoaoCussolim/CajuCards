@@ -1,8 +1,10 @@
+import 'package:cajucards/api/services/socket_service.dart';
 import 'package:cajucards/components/card_sprite.dart';
 import 'package:cajucards/models/card.dart' as card_model;
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 
+import 'battle_screen.dart';
 import 'playground.dart';
 
 class BattleArenaScreen extends StatefulWidget {
@@ -18,6 +20,16 @@ class BattleArenaScreen extends StatefulWidget {
     );
   }
 
+  factory BattleArenaScreen.online({
+    Key? key,
+    required SocketService socketService,
+  }) {
+    return BattleArenaScreen._(
+      gameBuilder: () => CajuPlaygroundGame(socketService: socketService),
+      key: key,
+    );
+  }
+
   final CajuPlaygroundGame Function() _gameBuilder;
 
   @override
@@ -27,12 +39,14 @@ class BattleArenaScreen extends StatefulWidget {
 class _BattleArenaScreenState extends State<BattleArenaScreen> {
   late final CajuPlaygroundGame _game;
   bool _started = false;
+  bool _exitingToLobby = false;
 
   @override
   void initState() {
     super.initState();
     _game = widget._gameBuilder();
     _game.readinessNotifier.addListener(_handleReadinessChange);
+    _handleReadinessChange();
   }
 
   void _handleReadinessChange() {
@@ -51,65 +65,105 @@ class _BattleArenaScreenState extends State<BattleArenaScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          GameWidget(game: _game),
-          ValueListenableBuilder<bool>(
-            valueListenable: _game.readinessNotifier,
-            builder: (context, ready, _) {
-              if (ready) {
-                return const SizedBox.shrink();
-              }
+    return WillPopScope(
+      onWillPop: _handleWillPop,
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            GameWidget(game: _game),
+            ValueListenableBuilder<bool>(
+              valueListenable: _game.readinessNotifier,
+              builder: (context, ready, _) {
+                if (ready) {
+                  return const SizedBox.shrink();
+                }
 
-              return Container(
-                color: Colors.black87,
-                child: const Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CircularProgressIndicator(color: Colors.white),
-                      SizedBox(height: 16),
-                      Text(
-                        'Carregando batalha...',
-                        style: TextStyle(
-                          fontFamily: 'VT323',
-                          fontSize: 24,
-                          color: Colors.white,
+                return Container(
+                  color: Colors.black87,
+                  child: const Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircularProgressIndicator(color: Colors.white),
+                        SizedBox(height: 16),
+                        Text(
+                          'Carregando batalha...',
+                          style: TextStyle(
+                            fontFamily: 'VT323',
+                            fontSize: 24,
+                            color: Colors.white,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              );
-            },
-          ),
-          SafeArea(
-            child: Stack(
-              children: [
-                Align(
-                  alignment: Alignment.topLeft,
-                  child: _BackButton(onPressed: () => Navigator.pop(context)),
-                ),
-                Align(
-                  alignment: Alignment.topCenter,
-                  child: _BattleHud(game: _game),
-                ),
-                Align(
-                  alignment: Alignment.bottomLeft,
-                  child: _EnergyMeter(game: _game),
-                ),
-                Align(
-                  alignment: Alignment.bottomRight,
-                  child: _ShopPanel(game: _game),
-                ),
-              ],
+                );
+              },
             ),
-          ),
-        ],
+            SafeArea(
+              child: Stack(
+                children: [
+                  Align(
+                    alignment: Alignment.topLeft,
+                    child: _BackButton(onPressed: _leaveToLobby),
+                  ),
+                  Align(
+                    alignment: Alignment.topCenter,
+                    child: _BattleHud(game: _game),
+                  ),
+                  Align(
+                    alignment: Alignment.bottomLeft,
+                    child: _EnergyMeter(game: _game),
+                  ),
+                  Align(
+                    alignment: Alignment.bottomRight,
+                    child: _ShopPanel(game: _game),
+                  ),
+                ],
+              ),
+            ),
+            ValueListenableBuilder<BattleOutcome?>(
+              valueListenable: _game.outcomeNotifier,
+              builder: (context, outcome, _) {
+                if (outcome == null) {
+                  return const SizedBox.shrink();
+                }
+
+                return _BattleOutcomeOverlay(
+                  outcome: outcome,
+                  onExit: _leaveToLobby,
+                );
+              },
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  Future<bool> _handleWillPop() async {
+    _leaveToLobby();
+    return false;
+  }
+
+  void _leaveToLobby() {
+    if (_exitingToLobby || !mounted) {
+      return;
+    }
+
+    _exitingToLobby = true;
+    _game.stopSimulation();
+    _game.socketService?.leaveCurrentMatch();
+
+    Navigator.of(context).pushAndRemoveUntil(
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) => const BattleScreen(),
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
+      ),
+      (route) => false,
     );
   }
 }
@@ -455,6 +509,86 @@ class _ShopPanel extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BattleOutcomeOverlay extends StatelessWidget {
+  const _BattleOutcomeOverlay({
+    required this.outcome,
+    required this.onExit,
+  });
+
+  final BattleOutcome outcome;
+  final VoidCallback onExit;
+
+  @override
+  Widget build(BuildContext context) {
+    final isVictory = outcome == BattleOutcome.victory;
+    final bannerAsset =
+        isVictory ? 'assets/images/victory.png' : 'assets/images/defeat.png';
+    final title = isVictory ? 'Vitória!' : 'Derrota';
+    final description = isVictory
+        ? 'Sua tropa destruiu a torre adversária.'
+        : 'Sua torre foi destruída. Tente novamente!';
+
+    return Container(
+      color: Colors.black.withOpacity(0.78),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset(bannerAsset, width: 220),
+              const SizedBox(height: 24),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontFamily: 'VT323',
+                  fontSize: 52,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                description,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: 'VT323',
+                  fontSize: 24,
+                  color: Colors.white.withOpacity(0.92),
+                ),
+              ),
+              const SizedBox(height: 32),
+              GestureDetector(
+                onTap: onExit,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 60,
+                    vertical: 14,
+                  ),
+                  decoration: const BoxDecoration(
+                    image: DecorationImage(
+                      image: AssetImage('assets/images/button.png'),
+                      fit: BoxFit.fill,
+                    ),
+                  ),
+                  child: const Text(
+                    'Voltar ao menu',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontFamily: 'VT323',
+                      fontSize: 28,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),

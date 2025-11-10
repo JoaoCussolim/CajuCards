@@ -1,16 +1,20 @@
 import 'dart:async';
 import 'dart:math' as math;
+
 import 'package:cajucards/api/api_client.dart';
 import 'package:cajucards/api/services/card_service.dart';
 import 'package:cajucards/api/services/socket_service.dart';
 import 'package:cajucards/components/card_sprite.dart';
 import 'package:cajucards/components/creature_sprite.dart';
+import 'package:cajucards/models/card.dart' as card_model;
 import 'package:flame/components.dart';
 import 'package:flame/effects.dart';
 import 'package:flame/events.dart';
 import 'package:flame/game.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:cajucards/models/card.dart' as card_model;
+
+enum BattleOutcome { victory, defeat }
 
 class SpellEffect {
   final Vector2 center;
@@ -242,30 +246,54 @@ class TroopComponent extends CreatureSprite {
   }
 }
 
-class TowerComponent extends SpriteComponent {
+class TowerComponent extends PositionComponent {
   TowerComponent({
-    required Sprite sprite,
+    required Sprite? sprite,
     required Vector2 size,
     required Vector2 position,
     required Anchor anchor,
     this.isOpponent = false,
-  }) : super(
-         sprite: sprite,
-         size: size,
-         position: position,
-         anchor: anchor,
-         priority: 50,
-       );
+  })  : _sprite = sprite,
+        super(
+          size: size,
+          position: position,
+          anchor: anchor,
+          priority: 50,
+        );
 
+  final Sprite? _sprite;
   final bool isOpponent;
 
   @override
   Future<void> onLoad() async {
     await super.onLoad();
-    // Se quiser espelhar a torre do oponente (caso o sprite peça)
-    if (isOpponent) {
-      flipHorizontally();
+
+    if (_sprite != null) {
+      final spriteComponent = SpriteComponent(
+        sprite: _sprite!,
+        size: size,
+        anchor: Anchor.center,
+        position: size / 2,
+      );
+
+      if (isOpponent) {
+        spriteComponent.flipHorizontally();
+      }
+
+      add(spriteComponent);
+      return;
     }
+
+    add(
+      RectangleComponent(
+        size: size,
+        position: size / 2,
+        anchor: Anchor.center,
+        paint: Paint()
+          ..color = const Color(0xFF8d99ae)
+          ..style = PaintingStyle.fill,
+      ),
+    );
   }
 }
 
@@ -297,14 +325,10 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
   final double maxEnergy = 10.0;
   final double energyPerSecond = 1.0;
   double matchTimeSeconds = 0;
-  late final SpriteComponent backgroundLayer;
-  late final Sprite _defaultPlayerBackgroundSprite;
   final ValueNotifier<double> energyRatioNotifier = ValueNotifier(0);
   final ValueNotifier<double> matchTimeNotifier = ValueNotifier<double>(0);
   final ValueNotifier<List<card_model.Card>> shopCardsNotifier =
       ValueNotifier<List<card_model.Card>>([]);
-  final ValueNotifier<String?> backgroundSynergyNotifier =
-      ValueNotifier<String?>(null);
   final ValueNotifier<double> playerHealthRatioNotifier = ValueNotifier<double>(
     1,
   );
@@ -314,6 +338,8 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     false,
   );
   final ValueNotifier<bool> readinessNotifier = ValueNotifier<bool>(false);
+  final ValueNotifier<BattleOutcome?> outcomeNotifier =
+      ValueNotifier<BattleOutcome?>(null);
   final int shopSize = 3;
   late final TowerComponent playerTowerComponent;
   late final TowerComponent opponentTowerComponent;
@@ -325,12 +351,12 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
   final Map<TroopComponent, card_model.TroopCard> _creaturesInField = {};
   final Map<TroopComponent, card_model.TroopCard> _opponentTroops = {};
   List<card_model.Card> _allCards = [];
+  List<card_model.TroopCard> _botTroopDeck = [];
   final math.Random _random = math.Random();
-  BotController? _botController;
+  bool _initialBotTroopsSpawned = false;
   card_model.SpellCard? _pendingSpellCard;
   CardSprite? _pendingSpellSprite;
 
-  String? get activeBackgroundSynergy => backgroundSynergyNotifier.value;
   bool get isSimulationRunning => _simulationRunning;
   bool get isReady => _initialized;
 
@@ -346,12 +372,6 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
 
   bool canSummonCreatureWithSynergy(String synergy) {
     final currentSynergies = activeSynergies;
-
-    final backgroundSynergy = backgroundSynergyNotifier.value;
-
-    if (backgroundSynergy != null) {
-      return backgroundSynergy == synergy;
-    }
 
     if (currentSynergies.contains(synergy)) {
       return true;
@@ -373,24 +393,31 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
 
     try {
       print("Buscando cartas...");
-      _allCards = await cardService.getAllCards();
-      print("Recebidas ${_allCards.length} cartas.");
+      final fetchedCards = await cardService.getAllCards();
+      print("Recebidas ${fetchedCards.length} cartas.");
 
-      if (_allCards.isEmpty) {
-        print("Nenhuma carta encontrada na API.");
-        return;
+      _allCards = fetchedCards
+          .where((card) => card.type != card_model.CardType.biome)
+          .toList();
+
+      if (_allCards.length != fetchedCards.length) {
+        final removed = fetchedCards.length - _allCards.length;
+        print('Descartando $removed cartas de bioma.');
       }
-
-      _dealHandCards();
-      _populateShop();
     } catch (e, stackTrace) {
       print("--- ERRO AO CARREGAR CARTAS DA API ---");
       print(e);
       print(stackTrace);
     }
 
-    if (_allCards.isNotEmpty) {
-      _botController = BotController(game: this);
+    _ensureMinimumCardPool();
+    _prepareBotDeck();
+
+    if (_allCards.isEmpty) {
+      print("Nenhuma carta jogável disponível. Utilizando baralho padrão.");
+    } else {
+      _dealHandCards();
+      _populateShop();
     }
 
     _initialized = true;
@@ -406,26 +433,46 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
   Future<void> _buildArena() async {
     final dividerHeight = size.y * 0.82;
 
-    final groundSprite = await Sprite.load('assets/images/WoodBasic.png');
-    final towerSprite = await Sprite.load('images/sprites/tower.png');
+    final groundSprite = await _loadSpriteOrNull('assets/images/WoodBasic.png');
+    final towerSprite = await _loadSpriteOrNull('assets/images/sprites/tower.png');
 
-    _defaultPlayerBackgroundSprite = groundSprite;
-    backgroundLayer = SpriteComponent(
-      sprite: _defaultPlayerBackgroundSprite,
-      size: Vector2(size.x / 2, size.y),
-      position: Vector2.zero(),
-      anchor: Anchor.topLeft,
-    );
-    add(backgroundLayer);
+    if (groundSprite != null) {
+      add(
+        SpriteComponent(
+          sprite: groundSprite,
+          size: Vector2(size.x / 2, size.y),
+          position: Vector2.zero(),
+          anchor: Anchor.topLeft,
+        ),
+      );
 
-    add(
-      SpriteComponent(
-        sprite: groundSprite,
-        size: Vector2(size.x / 2, size.y),
-        position: Vector2(size.x, 0),
-        anchor: Anchor.topRight,
-      ),
-    );
+      add(
+        SpriteComponent(
+          sprite: groundSprite,
+          size: Vector2(size.x / 2, size.y),
+          position: Vector2(size.x, 0),
+          anchor: Anchor.topRight,
+        ),
+      );
+    } else {
+      const fallbackColor = Color(0xFF1f2338);
+      add(
+        RectangleComponent(
+          size: Vector2(size.x / 2, size.y),
+          position: Vector2.zero(),
+          anchor: Anchor.topLeft,
+          paint: Paint()..color = fallbackColor,
+        ),
+      );
+      add(
+        RectangleComponent(
+          size: Vector2(size.x / 2, size.y),
+          position: Vector2(size.x, 0),
+          anchor: Anchor.topRight,
+          paint: Paint()..color = fallbackColor,
+        ),
+      );
+    }
 
     final battlefieldSurface = RectangleComponent(
       size: Vector2(size.x * 0.86, size.y * 0.64),
@@ -509,27 +556,14 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     );
   }
 
-  Future<void> applyBackgroundBiome(String synergy) async {
-    if (activeBackgroundSynergy == synergy) {
-      return;
-    }
-
-    final spritePath = 'assets/images/sprites/background/$synergy.png';
-
+  Future<Sprite?> _loadSpriteOrNull(String assetPath) async {
     try {
-      final newSprite = await loadSprite(spritePath);
-      backgroundLayer.sprite = newSprite;
-      backgroundSynergyNotifier.value = synergy;
+      return await Sprite.load(assetPath);
     } catch (error, stackTrace) {
-      print('Não foi possível carregar o bioma "$synergy" ($spritePath).');
-      print(error);
-      print(stackTrace);
+      debugPrint('Falha ao carregar sprite "$assetPath": $error');
+      debugPrint('$stackTrace');
+      return null;
     }
-  }
-
-  void resetBackgroundBiome() {
-    backgroundLayer.sprite = _defaultPlayerBackgroundSprite;
-    backgroundSynergyNotifier.value = null;
   }
 
   @override
@@ -551,7 +585,6 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     energyRatioNotifier.value = currentEnergy / maxEnergy;
 
     _updateBattlefield(dt);
-    _botController?.update(dt);
   }
 
   @override
@@ -559,11 +592,11 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     energyRatioNotifier.dispose();
     matchTimeNotifier.dispose();
     shopCardsNotifier.dispose();
-    backgroundSynergyNotifier.dispose();
     playerHealthRatioNotifier.dispose();
     opponentHealthRatioNotifier.dispose();
     simulationRunningNotifier.dispose();
     readinessNotifier.dispose();
+    outcomeNotifier.dispose();
     super.onRemove();
   }
 
@@ -574,15 +607,20 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     _clearSpellSelection();
     _simulationRunning = true;
     simulationRunningNotifier.value = true;
-    _botController?.reset();
+    if (isBotMode) {
+      _spawnInitialBotTroops();
+    }
   }
 
-  void stopSimulation() {
+  void stopSimulation({BattleOutcome? outcome}) {
     if (!_initialized || !_simulationRunning) {
       return;
     }
     _simulationRunning = false;
     simulationRunningNotifier.value = false;
+    if (outcome != null && outcomeNotifier.value == null) {
+      outcomeNotifier.value = outcome;
+    }
   }
 
   void resetSimulation() {
@@ -601,10 +639,10 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     matchTimeNotifier.value = 0;
     playerHealthRatioNotifier.value = 1;
     opponentHealthRatioNotifier.value = 1;
+    outcomeNotifier.value = null;
     _clearBattlefield();
-    resetBackgroundBiome();
     _populateShop();
-    _botController?.reset();
+    _initialBotTroopsSpawned = false;
   }
 
   void applyBaseDamage({required bool toOpponent, required double amount}) {
@@ -661,6 +699,120 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     _opponentTroops.clear();
   }
 
+  void _ensureMinimumCardPool() {
+    final fallback = _fallbackCards();
+
+    if (_allCards.isEmpty) {
+      _allCards = List<card_model.Card>.from(fallback);
+      return;
+    }
+
+    final existingIds = _allCards.map((card) => card.id).toSet();
+
+    final troopCount =
+        _allCards.whereType<card_model.TroopCard>().length;
+    var neededTroops = 2 - troopCount;
+    if (neededTroops > 0) {
+      for (final troop in fallback.whereType<card_model.TroopCard>()) {
+        if (neededTroops <= 0) {
+          break;
+        }
+        if (existingIds.add(troop.id)) {
+          _allCards.add(troop);
+          neededTroops -= 1;
+        }
+      }
+    }
+
+    final hasSpell = _allCards.any((card) => card is card_model.SpellCard);
+    if (!hasSpell) {
+      for (final spell in fallback.whereType<card_model.SpellCard>()) {
+        if (existingIds.add(spell.id)) {
+          _allCards.add(spell);
+        }
+        break;
+      }
+    }
+  }
+
+  void _prepareBotDeck() {
+    final troops = _allCards
+        .whereType<card_model.TroopCard>()
+        .toList(growable: false);
+
+    if (troops.isEmpty) {
+      _botTroopDeck = [];
+      return;
+    }
+
+    final sortedTroops = List<card_model.TroopCard>.from(troops)
+      ..sort((a, b) => a.chestnutCost.compareTo(b.chestnutCost));
+
+    if (sortedTroops.length == 1) {
+      sortedTroops.add(sortedTroops.first);
+    }
+
+    _botTroopDeck = sortedTroops.take(2).toList(growable: false);
+  }
+
+  void _spawnInitialBotTroops() {
+    if (!isBotMode || _initialBotTroopsSpawned) {
+      return;
+    }
+
+    if (_botTroopDeck.isEmpty) {
+      return;
+    }
+
+    final lanes = _laneCenters.isEmpty ? null : List<double>.from(_laneCenters);
+    for (var i = 0; i < _botTroopDeck.length; i++) {
+      final lane = lanes == null || lanes.isEmpty
+          ? null
+          : lanes[i % lanes.length];
+      spawnOpponentTroop(_botTroopDeck[i], laneY: lane);
+    }
+
+    _initialBotTroopsSpawned = true;
+  }
+
+  List<card_model.Card> _fallbackCards() {
+    return [
+      card_model.TroopCard(
+        id: 'fallback_robot',
+        name: 'Robô Guerreiro',
+        description: 'Avança sem parar para proteger a torre.',
+        synergy: 'Futuristic',
+        rarity: 'Mercury',
+        chestnutCost: 3,
+        spritePath: 'sprites/robot.png',
+        health: 280,
+        damage: 32,
+      ),
+      card_model.TroopCard(
+        id: 'fallback_gigantossaur',
+        name: 'Gigantossauro',
+        description: 'Criatura colossal focada em dano corpo a corpo.',
+        synergy: 'Primordial',
+        rarity: 'Plutonium',
+        chestnutCost: 5,
+        spritePath: 'sprites/gigantossaur.png',
+        health: 420,
+        damage: 48,
+      ),
+      card_model.SpellCard(
+        id: 'fallback_meteor',
+        name: 'Meteoro',
+        description: 'Invoca um meteoro que causa dano em área.',
+        synergy: 'Cosmic',
+        rarity: 'Uranium',
+        chestnutCost: 4,
+        spritePath: 'sprites/meteor.png',
+        radius: 120,
+        damage: 45,
+      ),
+    ];
+  }
+
   void _dealHandCards() {
     final handCount = math.min(5, _allCards.length);
     final handCards = _allCards.take(handCount).toList();
@@ -700,16 +852,17 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     energyRatioNotifier.value = currentEnergy / maxEnergy;
   }
 
-  void spawnCreatureAndAttack(card_model.TroopCard cardData) {
-    final laneY = _pickLaneY();
-    final spawnPosition = _playerSpawnPoint(laneY);
+  void spawnCreatureAndAttack(card_model.TroopCard cardData,
+      {double? laneY}) {
+    final lane = laneY ?? _pickLaneY();
+    final spawnPosition = _playerSpawnPoint(lane);
 
     final troop =
         TroopComponent(
             game: this,
             cardData: cardData,
             isOpponent: false,
-            laneY: laneY,
+            laneY: lane,
           )
           ..position = spawnPosition
           ..anchor = Anchor.center;
@@ -718,16 +871,16 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     add(troop);
   }
 
-  void spawnOpponentTroop(card_model.TroopCard cardData) {
-    final laneY = _pickLaneY();
-    final spawnPosition = _opponentSpawnPoint(laneY);
+  void spawnOpponentTroop(card_model.TroopCard cardData, {double? laneY}) {
+    final lane = laneY ?? _pickLaneY();
+    final spawnPosition = _opponentSpawnPoint(lane);
 
     final troop =
         TroopComponent(
             game: this,
             cardData: cardData,
             isOpponent: true,
-            laneY: laneY,
+            laneY: lane,
           )
           ..position = spawnPosition
           ..anchor = Anchor.center
@@ -869,7 +1022,9 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     }
 
     if (playerHealth <= 0 || opponentHealth <= 0) {
-      stopSimulation();
+      final outcome =
+          opponentHealth <= 0 ? BattleOutcome.victory : BattleOutcome.defeat;
+      stopSimulation(outcome: outcome);
     }
   }
 
@@ -982,81 +1137,6 @@ class PlaygroundScreen extends StatefulWidget {
 
   @override
   State<PlaygroundScreen> createState() => _PlaygroundScreenState();
-}
-
-class BotController {
-  BotController({
-    required this.game,
-    this.minDecisionInterval = 3.0,
-    this.maxDecisionInterval = 6.0,
-  }) : _decisionTimer = 0 {
-    _resetTimer();
-  }
-
-  final CajuPlaygroundGame game;
-  final double minDecisionInterval;
-  final double maxDecisionInterval;
-  double _decisionTimer;
-  final math.Random _random = math.Random();
-
-  void update(double dt) {
-    if (!game._simulationRunning) {
-      return;
-    }
-
-    if (game._allCards.isEmpty) {
-      return;
-    }
-
-    _decisionTimer -= dt;
-    if (_decisionTimer > 0) {
-      return;
-    }
-
-    _playRandomCard();
-    _resetTimer();
-  }
-
-  void reset() {
-    _decisionTimer = 0;
-    _resetTimer();
-  }
-
-  void _resetTimer() {
-    final intervalRange = maxDecisionInterval - minDecisionInterval;
-    _decisionTimer = minDecisionInterval + _random.nextDouble() * intervalRange;
-  }
-
-  void _playRandomCard() {
-    final pool = game.shopCardsNotifier.value.isNotEmpty
-        ? game.shopCardsNotifier.value
-        : game._allCards;
-
-    if (pool.isEmpty) {
-      return;
-    }
-
-    var attempts = 0;
-    while (attempts < 5) {
-      final card = pool[_random.nextInt(pool.length)];
-
-      if (card is card_model.TroopCard) {
-        game.spawnOpponentTroop(card);
-        return;
-      }
-
-      if (card is card_model.SpellCard) {
-        final position = Vector2(
-          game.size.x * (0.25 + _random.nextDouble() * 0.4),
-          game.size.y * (0.25 + _random.nextDouble() * 0.5),
-        );
-        game.castSpell(card, targetPosition: position, byPlayer: false);
-        return;
-      }
-
-      attempts += 1;
-    }
-  }
 }
 
 class _PlaygroundScreenState extends State<PlaygroundScreen> {
