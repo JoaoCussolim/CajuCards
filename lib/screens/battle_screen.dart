@@ -6,9 +6,9 @@ import 'package:cajucards/models/player.dart';
 import 'shop_screen.dart';
 import 'history_screen.dart';
 import 'package:cajucards/api/services/socket_service.dart';
-import 'training_battle_screen.dart';
+import 'pve_battle_screen.dart';
 
-enum BattleMode { pvp, training }
+enum BattleMode { pvp, pve }
 
 class BattleScreen extends StatefulWidget {
   const BattleScreen({super.key});
@@ -19,7 +19,7 @@ class BattleScreen extends StatefulWidget {
 
 class _BattleScreenState extends State<BattleScreen> {
   BattleMode _selectedMode = BattleMode.pvp;
-  bool _launchingTraining = false;
+  bool _launchingPve = false;
 
   @override
   void _onModeSelected(BattleMode mode) {
@@ -45,19 +45,19 @@ class _BattleScreenState extends State<BattleScreen> {
     );
   }
 
-  Future<void> _openTraining() async {
-    if (_launchingTraining) {
+  Future<void> _openPveBattle() async {
+    if (_launchingPve) {
       return;
     }
 
     setState(() {
-      _launchingTraining = true;
+      _launchingPve = true;
     });
 
     await Navigator.push(
       context,
       PageRouteBuilder(
-        pageBuilder: (_, __, ___) => const TrainingBattleScreen(),
+        pageBuilder: (_, __, ___) => const PveBattleScreen(),
         transitionDuration: Duration.zero,
         reverseTransitionDuration: Duration.zero,
       ),
@@ -68,7 +68,7 @@ class _BattleScreenState extends State<BattleScreen> {
     }
 
     setState(() {
-      _launchingTraining = false;
+      _launchingPve = false;
     });
   }
 
@@ -191,10 +191,10 @@ class _BattleScreenState extends State<BattleScreen> {
                             key: const ValueKey('pvp-mode'),
                             onStart: _startMatchmaking,
                           )
-                        : _TrainingPanel(
-                            key: const ValueKey('training-mode'),
-                            onLaunch: _openTraining,
-                            isLoading: _launchingTraining,
+                        : _PvePanel(
+                            key: const ValueKey('pve-mode'),
+                            onLaunch: _openPveBattle,
+                            isLoading: _launchingPve,
                           ),
                   ),
                 ),
@@ -286,9 +286,9 @@ class _ModeSelector extends StatelessWidget {
             onTap: () => onSelected(BattleMode.pvp),
           ),
           _ModeSelectorButton(
-            label: 'Treino PvE',
-            isSelected: selectedMode == BattleMode.training,
-            onTap: () => onSelected(BattleMode.training),
+            label: 'PvE Contra Bot',
+            isSelected: selectedMode == BattleMode.pve,
+            onTap: () => onSelected(BattleMode.pve),
           ),
         ],
       ),
@@ -367,8 +367,8 @@ class _PvpPanel extends StatelessWidget {
   }
 }
 
-class _TrainingPanel extends StatelessWidget {
-  const _TrainingPanel({
+class _PvePanel extends StatelessWidget {
+  const _PvePanel({
     super.key,
     required this.onLaunch,
     required this.isLoading,
@@ -383,7 +383,7 @@ class _TrainingPanel extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
-          'Pratique suas estratégias contra um bot local sem gastar energia!',
+          'Enfrente um bot local usando o mesmo campo das batalhas normais!',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontFamily: 'VT323',
@@ -393,7 +393,7 @@ class _TrainingPanel extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         Text(
-          'Monte combinações, teste cartas e descubra novos biomas antes de desafiar outros jogadores.',
+          'Teste decks, explore biomas e aprenda o ritmo da partida antes de desafiar outros jogadores.',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontFamily: 'VT323',
@@ -414,7 +414,7 @@ class _TrainingPanel extends StatelessWidget {
           const CircularProgressIndicator(color: Colors.white),
           const SizedBox(height: 12),
           Text(
-            'Preparando arena de treino...',
+            'Carregando arena PvE...',
             style: TextStyle(
               fontFamily: 'VT323',
               fontSize: 22,
