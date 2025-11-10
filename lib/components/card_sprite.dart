@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
@@ -11,6 +12,7 @@ final Vector2 cardSize = Vector2(100, 140);
 class CardSprite extends PositionComponent with TapCallbacks {
   final card_model.Card card;
   final CajuPlaygroundGame game;
+  late final RectangleComponent _selectionOutline;
 
   CardSprite({
     required this.card,
@@ -21,7 +23,7 @@ class CardSprite extends PositionComponent with TapCallbacks {
   Future<void> onLoad() async {
     super.onLoad();
 
-    const basePath = 'images/sprites';
+    const basePath = 'assets/images/sprites';
     final backgroundPath = '$basePath/background/${card.synergy}.png';
     final borderPath = '$basePath/border/${card.rarity}.png';
     final characterPath = '$basePath/${card.spritePath}';
@@ -65,6 +67,20 @@ class CardSprite extends PositionComponent with TapCallbacks {
     add(characterSprite);
     add(rarityBorder);
     add(costText);
+
+    _selectionOutline = RectangleComponent(
+      size: size,
+      position: Vector2.zero(),
+      anchor: Anchor.topLeft,
+      paint: Paint()
+        ..color = Colors.amberAccent
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4,
+    )
+      ..priority = 10
+      ..opacity = 0;
+
+    add(_selectionOutline);
   }
 
   @override
@@ -85,8 +101,8 @@ class CardSprite extends PositionComponent with TapCallbacks {
 
     if (card is card_model.SpellCard) {
       final spellCard = card as card_model.SpellCard;
-      game.currentEnergy -= spellCard.chestnutCost;
-      game.castSpell(spellCard);
+      game.prepareSpell(spellCard, this);
+      event.handled = true;
       return;
     }
 
@@ -107,5 +123,9 @@ class CardSprite extends PositionComponent with TapCallbacks {
 
     print('Invocando: ${troopCard.name}');
     game.spawnCreatureAndAttack(troopCard);
+  }
+
+  void setSelected(bool selected) {
+    _selectionOutline.opacity = selected ? 1 : 0;
   }
 }

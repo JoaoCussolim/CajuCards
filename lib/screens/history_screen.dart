@@ -66,11 +66,6 @@ class HistoryScreen extends StatelessWidget {
                       coins: player.cashewCoins,
                     ),
                   ),
-                  const SizedBox(width: 20),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 6.0),
-                    child: Image.asset('assets/images/Gear.png', width: 120),
-                  ),
                 ],
               ),
             ),
