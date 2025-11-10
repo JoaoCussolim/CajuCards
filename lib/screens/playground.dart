@@ -11,6 +11,7 @@ import 'package:flame/events.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:cajucards/models/card.dart' as card_model;
+import 'package:cajucards/screens/victory_screen.dart';
 
 class SpellEffect {
   final Vector2 center;
@@ -279,11 +280,17 @@ class ArenaDivider extends RectangleComponent {
       );
 }
 
+enum EndReason { playerVictory, playerDefeat, draw }
+
 class CajuPlaygroundGame extends FlameGame with TapCallbacks {
   static const double handBottomInset = 80;
 
   CajuPlaygroundGame({this.socketService, this.isBotMode = false})
     : _simulationRunning = false;
+
+  void Function(EndReason reason, Duration matchTime)? onEnd;
+
+  bool _endFired = false;
 
   CajuPlaygroundGame.bot() : this(isBotMode: true);
 
@@ -574,11 +581,25 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
   }
 
   void stopSimulation() {
-    if (!_initialized || !_simulationRunning) {
-      return;
-    }
     _simulationRunning = false;
     simulationRunningNotifier.value = false;
+
+    if (_endFired) return;
+    _endFired = true;
+
+    final EndReason reason;
+    if (opponentHealth <= 0 && playerHealth > 0) {
+      reason = EndReason.playerVictory;
+    } else if (playerHealth <= 0 && opponentHealth > 0) {
+      reason = EndReason.playerDefeat;
+    } else {
+      reason = EndReason.draw;
+    }
+
+    onEnd?.call(
+      reason,
+      Duration(milliseconds: (matchTimeSeconds * 1000).round()),
+    );
   }
 
   void resetSimulation() {
@@ -588,6 +609,8 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
 
     stopSimulation();
     _clearSpellSelection();
+
+    _endFired = false;
 
     currentEnergy = 0;
     matchTimeSeconds = 0;
@@ -981,21 +1004,17 @@ class PlaygroundScreen extends StatefulWidget {
 }
 
 class _ScheduledPlay {
-  const _ScheduledPlay({
-    required this.timeOffset,
-    required this.card,
-  });
+  const _ScheduledPlay({required this.timeOffset, required this.card});
 
   final double timeOffset;
   final card_model.TroopCard card;
 }
 
 class BotController {
-  BotController({
-    required this.game,
-  })  : _schedule = [],
-        _elapsedTime = 0,
-        _nextPlayIndex = 0 {
+  BotController({required this.game})
+    : _schedule = [],
+      _elapsedTime = 0,
+      _nextPlayIndex = 0 {
     _initializeSchedule();
   }
 
@@ -1005,8 +1024,6 @@ class BotController {
   int _nextPlayIndex;
 
   void update(double dt) {
-    
-
     _elapsedTime += dt;
 
     while (_nextPlayIndex < _schedule.length &&
@@ -1023,8 +1040,9 @@ class BotController {
   }
 
   void _initializeSchedule() {
-    final troopCards =
-        game._allCards.whereType<card_model.TroopCard>().toList();
+    final troopCards = game._allCards
+        .whereType<card_model.TroopCard>()
+        .toList();
 
     if (troopCards.length < 2) {
       return;
@@ -1047,6 +1065,17 @@ class _PlaygroundScreenState extends State<PlaygroundScreen> {
   void initState() {
     super.initState();
     _game = CajuPlaygroundGame(socketService: _socketService);
+
+    _game.onEnd = (reason, duration) {
+      if (!mounted) return;
+      if (reason == EndReason.playerVictory) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => VictoryScreen(),
+          ),
+        );
+      }
+    };
     // _socketService.connectAndListen(); // Podemos desabilitar para a simulação
   }
 
