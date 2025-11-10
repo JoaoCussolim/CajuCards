@@ -710,7 +710,7 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     )
       ..position = spawnPosition
       ..anchor = Anchor.center
-      ..flipHorizontally = true;
+      ..flipHorizontally();
 
     _trackOpponentTroop(troop, cardData);
     add(troop);

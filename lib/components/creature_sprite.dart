@@ -14,7 +14,7 @@ class CreatureSprite extends SpriteComponent {
   @override
   Future<void> onLoad() async {
     super.onLoad();
-    sprite = await Sprite.load('assets/images/sprites/${cardData.spritePath}');
+    sprite = await Sprite.load('images/sprites/${cardData.spritePath}');
   }
 
   Future<void> attack() async {
