@@ -5,21 +5,33 @@ import 'package:flutter/material.dart';
 
 import 'playground.dart';
 
-class PveBattleScreen extends StatefulWidget {
-  const PveBattleScreen({super.key});
+class BattleArenaScreen extends StatefulWidget {
+  const BattleArenaScreen._({
+    required CajuPlaygroundGame Function() gameBuilder,
+    super.key,
+  }) : _gameBuilder = gameBuilder;
+
+  factory BattleArenaScreen.bot({Key? key}) {
+    return BattleArenaScreen._(
+      gameBuilder: CajuPlaygroundGame.bot,
+      key: key,
+    );
+  }
+
+  final CajuPlaygroundGame Function() _gameBuilder;
 
   @override
-  State<PveBattleScreen> createState() => _PveBattleScreenState();
+  State<BattleArenaScreen> createState() => _BattleArenaScreenState();
 }
 
-class _PveBattleScreenState extends State<PveBattleScreen> {
+class _BattleArenaScreenState extends State<BattleArenaScreen> {
   late final CajuPlaygroundGame _game;
   bool _started = false;
 
   @override
   void initState() {
     super.initState();
-    _game = CajuPlaygroundGame.bot();
+    _game = widget._gameBuilder();
     _game.readinessNotifier.addListener(_handleReadinessChange);
   }
 
@@ -61,7 +73,7 @@ class _PveBattleScreenState extends State<PveBattleScreen> {
                       CircularProgressIndicator(color: Colors.white),
                       SizedBox(height: 16),
                       Text(
-                        'Carregando batalha PvE...',
+                        'Carregando batalha...',
                         style: TextStyle(
                           fontFamily: 'VT323',
                           fontSize: 24,
@@ -186,7 +198,7 @@ class _BattleHud extends StatelessWidget {
                       const SizedBox(width: 16),
                       Expanded(
                         child: _HealthMeter(
-                          label: 'Bot',
+                          label: 'Oponente',
                           alignment: Alignment.centerRight,
                           ratio: game.opponentHealthRatioNotifier.value,
                           current: game.opponentHealth,

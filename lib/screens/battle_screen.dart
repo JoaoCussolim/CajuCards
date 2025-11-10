@@ -6,9 +6,6 @@ import 'package:cajucards/models/player.dart';
 import 'shop_screen.dart';
 import 'history_screen.dart';
 import 'package:cajucards/api/services/socket_service.dart';
-import 'pve_battle_screen.dart';
-
-enum BattleMode { pvp, pve }
 
 class BattleScreen extends StatefulWidget {
   const BattleScreen({super.key});
@@ -18,18 +15,18 @@ class BattleScreen extends StatefulWidget {
 }
 
 class _BattleScreenState extends State<BattleScreen> {
-  BattleMode _selectedMode = BattleMode.pvp;
-  bool _launchingPve = false;
+  bool _launchingMatch = false;
 
-  @override
-  void _onModeSelected(BattleMode mode) {
-    if (_selectedMode == mode) {
+  void _onTapBattle() {
+    if (_launchingMatch) {
       return;
     }
 
     setState(() {
-      _selectedMode = mode;
+      _launchingMatch = true;
     });
+
+    _startMatchmaking();
   }
 
   void _startMatchmaking() {
@@ -43,33 +40,6 @@ class _BattleScreenState extends State<BattleScreen> {
         reverseTransitionDuration: Duration.zero,
       ),
     );
-  }
-
-  Future<void> _openPveBattle() async {
-    if (_launchingPve) {
-      return;
-    }
-
-    setState(() {
-      _launchingPve = true;
-    });
-
-    await Navigator.push(
-      context,
-      PageRouteBuilder(
-        pageBuilder: (_, __, ___) => const PveBattleScreen(),
-        transitionDuration: Duration.zero,
-        reverseTransitionDuration: Duration.zero,
-      ),
-    );
-
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {
-      _launchingPve = false;
-    });
   }
 
   @override
@@ -170,32 +140,44 @@ class _BattleScreenState extends State<BattleScreen> {
                         coins: player.cashewCoins,
                       ),
                     ),
-                    const SizedBox(width: 20),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 6.0),
-                      child: Image.asset('assets/images/Gear.png', width: 120),
-                    ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                _ModeSelector(
-                  selectedMode: _selectedMode,
-                  onSelected: _onModeSelected,
-                ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 32),
                 Expanded(
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 250),
-                    child: _selectedMode == BattleMode.pvp
-                        ? _PvpPanel(
-                            key: const ValueKey('pvp-mode'),
-                            onStart: _startMatchmaking,
-                          )
-                        : _PvePanel(
-                            key: const ValueKey('pve-mode'),
-                            onLaunch: _openPveBattle,
-                            isLoading: _launchingPve,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Encontre uma partida online. Caso nenhum oponente seja encontrado, um bot assumirá o duelo automaticamente.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: 'VT323',
+                          fontSize: 26,
+                          color: Colors.white.withOpacity(0.9),
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      GestureDetector(
+                        onTap: _launchingMatch ? null : _onTapBattle,
+                        child: Opacity(
+                          opacity: _launchingMatch ? 0.7 : 1,
+                          child: Image.asset('assets/images/buttonBattle.png', width: 520),
+                        ),
+                      ),
+                      if (_launchingMatch) ...[
+                        const SizedBox(height: 24),
+                        const CircularProgressIndicator(color: Colors.white),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Abrindo matchmaking...',
+                          style: TextStyle(
+                            fontFamily: 'VT323',
+                            fontSize: 22,
+                            color: Colors.white.withOpacity(0.85),
                           ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -257,172 +239,6 @@ class _TopBar extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _ModeSelector extends StatelessWidget {
-  const _ModeSelector({
-    required this.selectedMode,
-    required this.onSelected,
-  });
-
-  final BattleMode selectedMode;
-  final ValueChanged<BattleMode> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.35),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: Colors.white30),
-      ),
-      child: Row(
-        children: [
-          _ModeSelectorButton(
-            label: 'PvP Online',
-            isSelected: selectedMode == BattleMode.pvp,
-            onTap: () => onSelected(BattleMode.pvp),
-          ),
-          _ModeSelectorButton(
-            label: 'PvE Contra Bot',
-            isSelected: selectedMode == BattleMode.pve,
-            onTap: () => onSelected(BattleMode.pve),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ModeSelectorButton extends StatelessWidget {
-  const _ModeSelectorButton({
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final backgroundColor = isSelected
-        ? const Color(0xFFF98B25).withOpacity(0.85)
-        : Colors.transparent;
-    final textColor = isSelected ? const Color(0xFF4B2D18) : Colors.white;
-
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          decoration: BoxDecoration(
-            color: backgroundColor,
-            borderRadius: BorderRadius.circular(24),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: TextStyle(
-              fontFamily: 'VT323',
-              fontSize: 26,
-              color: textColor,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PvpPanel extends StatelessWidget {
-  const _PvpPanel({super.key, required this.onStart});
-
-  final VoidCallback onStart;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          'Encontre um oponente online para batalhar em tempo real!',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontFamily: 'VT323',
-            fontSize: 26,
-            color: Colors.white.withOpacity(0.9),
-          ),
-        ),
-        const SizedBox(height: 32),
-        GestureDetector(
-          onTap: onStart,
-          child: Image.asset('assets/images/buttonBattle.png', width: 520),
-        ),
-      ],
-    );
-  }
-}
-
-class _PvePanel extends StatelessWidget {
-  const _PvePanel({
-    super.key,
-    required this.onLaunch,
-    required this.isLoading,
-  });
-
-  final VoidCallback onLaunch;
-  final bool isLoading;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          'Enfrente um bot local usando o mesmo campo das batalhas normais!',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontFamily: 'VT323',
-            fontSize: 26,
-            color: Colors.white.withOpacity(0.9),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'Teste decks, explore biomas e aprenda o ritmo da partida antes de desafiar outros jogadores.',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontFamily: 'VT323',
-            fontSize: 22,
-            color: Colors.white.withOpacity(0.85),
-          ),
-        ),
-        const SizedBox(height: 32),
-        GestureDetector(
-          onTap: isLoading ? null : onLaunch,
-          child: Opacity(
-            opacity: isLoading ? 0.6 : 1,
-            child: Image.asset('assets/images/buttonBattle.png', width: 420),
-          ),
-        ),
-        if (isLoading) ...[
-          const SizedBox(height: 24),
-          const CircularProgressIndicator(color: Colors.white),
-          const SizedBox(height: 12),
-          Text(
-            'Carregando arena PvE...',
-            style: TextStyle(
-              fontFamily: 'VT323',
-              fontSize: 22,
-              color: Colors.white.withOpacity(0.8),
-            ),
-          ),
-        ],
-      ],
     );
   }
 }

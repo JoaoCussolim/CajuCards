@@ -3,7 +3,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:provider/provider.dart';
 import 'package:cajucards/api/services/socket_service.dart';
-import 'package:cajucards/screens/battle_screen.dart'; 
+import 'package:cajucards/screens/battle_arena_screen.dart';
 
 class MatchmakingScreen extends StatefulWidget {
   const MatchmakingScreen({super.key});
@@ -33,6 +33,9 @@ class _MatchmakingScreenState extends State<MatchmakingScreen>
     "Será que em um mundo de pessoas caju... todas as castanhas seriam castanhas de caju?",
     "Sabia que caju em inglês é cashew? cashew nut = castanha; cashew apple = fruta",
   ];
+
+  Timer? _fallbackToBotTimer;
+  bool _navigatedToMatch = false;
 
   @override
   void initState() {
@@ -75,6 +78,8 @@ class _MatchmakingScreenState extends State<MatchmakingScreen>
     // O Future.delayed de 10 segundos foi removido.
     // A navegação agora é controlada pelo Consumer no método build().
     // --- FIM DA REMOÇÃO ---
+
+    _startFallbackTimer();
   }
 
   @override
@@ -93,7 +98,44 @@ class _MatchmakingScreenState extends State<MatchmakingScreen>
     _pulsarController.dispose();
     _dotsTimer?.cancel();
     _phrasesTimer?.cancel();
+    _fallbackToBotTimer?.cancel();
     super.dispose();
+  }
+
+  void _startFallbackTimer() {
+    _fallbackToBotTimer?.cancel();
+    _fallbackToBotTimer = Timer(const Duration(seconds: 8), () {
+      if (!mounted) {
+        return;
+      }
+      final socketService = context.read<SocketService>();
+      if (socketService.status == MatchmakingStatus.searching) {
+        _navigateToBattle(vsBot: true);
+      }
+    });
+  }
+
+  void _navigateToBattle({required bool vsBot}) {
+    if (_navigatedToMatch || !mounted) {
+      return;
+    }
+
+    _navigatedToMatch = true;
+    _fallbackToBotTimer?.cancel();
+
+    final socketService = context.read<SocketService>();
+    if (vsBot && socketService.status == MatchmakingStatus.searching) {
+      socketService.cancelFindMatch();
+    }
+
+    Navigator.pushReplacement(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) => BattleArenaScreen.bot(),
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
+      ),
+    );
   }
 
   String _getTextoCarregamento(MatchmakingStatus status) {
@@ -125,14 +167,12 @@ class _MatchmakingScreenState extends State<MatchmakingScreen>
         // --- LÓGICA DE NAVEGAÇÃO ADICIONADA ---
         if (socketService.status == MatchmakingStatus.inMatch) {
           // Usamos addPostFrameCallback para navegar *após* o build
-          // Isso evita erros de "setState/Navigator during build"
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const BattleScreen()),
-              );
-            }
+            _navigateToBattle(vsBot: false);
+          });
+        } else if (socketService.status == MatchmakingStatus.error) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _navigateToBattle(vsBot: true);
           });
         }
         // --- FIM DA LÓGICA ---

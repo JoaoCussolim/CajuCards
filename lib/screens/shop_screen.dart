@@ -97,11 +97,6 @@ class ShopScreen extends StatelessWidget {
                     coins: player.cashewCoins,
                   ),
                 ),
-                const SizedBox(width: 20),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6.0),
-                  child: Image.asset('assets/images/Gear.png', width: 120),
-                ),
               ],
             ),
             // O conteúdo principal da loja (seleção de baús)
