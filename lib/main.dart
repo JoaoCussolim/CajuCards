@@ -24,7 +24,8 @@ void main() async {
       providers: [
         ChangeNotifierProvider(
           create: (context) => PlayerProvider(apiClient: apiClient),
-        ),
+        )
+        ,
         ChangeNotifierProvider(create: (context) => SocketService()),
       ],
       child: const MyApp(),
