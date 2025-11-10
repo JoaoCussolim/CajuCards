@@ -378,11 +378,10 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
 
       if (_allCards.isEmpty) {
         print("Nenhuma carta encontrada na API.");
-        return;
+      } else {
+        _dealHandCards();
+        _populateShop();
       }
-
-      _dealHandCards();
-      _populateShop();
     } catch (e, stackTrace) {
       print("--- ERRO AO CARREGAR CARTAS DA API ---");
       print(e);
