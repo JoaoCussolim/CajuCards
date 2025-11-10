@@ -353,7 +353,7 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
   List<card_model.Card> _allCards = [];
   List<card_model.TroopCard> _botTroopDeck = [];
   final math.Random _random = math.Random();
-  BotController? _botController;
+  bool _initialBotTroopsSpawned = false;
   card_model.SpellCard? _pendingSpellCard;
   CardSprite? _pendingSpellSprite;
 
@@ -418,13 +418,6 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     } else {
       _dealHandCards();
       _populateShop();
-    }
-
-    if (isBotMode && _botTroopDeck.isNotEmpty) {
-      _botController = BotController(
-        game: this,
-        troopDeck: _botTroopDeck,
-      );
     }
 
     _initialized = true;
@@ -592,7 +585,6 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     energyRatioNotifier.value = currentEnergy / maxEnergy;
 
     _updateBattlefield(dt);
-    _botController?.update(dt);
   }
 
   @override
@@ -615,7 +607,9 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     _clearSpellSelection();
     _simulationRunning = true;
     simulationRunningNotifier.value = true;
-    _botController?.reset();
+    if (isBotMode) {
+      _spawnInitialBotTroops();
+    }
   }
 
   void stopSimulation({BattleOutcome? outcome}) {
@@ -648,7 +642,7 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     outcomeNotifier.value = null;
     _clearBattlefield();
     _populateShop();
-    _botController?.reset();
+    _initialBotTroopsSpawned = false;
   }
 
   void applyBaseDamage({required bool toOpponent, required double amount}) {
@@ -761,6 +755,26 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     _botTroopDeck = sortedTroops.take(2).toList(growable: false);
   }
 
+  void _spawnInitialBotTroops() {
+    if (!isBotMode || _initialBotTroopsSpawned) {
+      return;
+    }
+
+    if (_botTroopDeck.isEmpty) {
+      return;
+    }
+
+    final lanes = _laneCenters.isEmpty ? null : List<double>.from(_laneCenters);
+    for (var i = 0; i < _botTroopDeck.length; i++) {
+      final lane = lanes == null || lanes.isEmpty
+          ? null
+          : lanes[i % lanes.length];
+      spawnOpponentTroop(_botTroopDeck[i], laneY: lane);
+    }
+
+    _initialBotTroopsSpawned = true;
+  }
+
   List<card_model.Card> _fallbackCards() {
     return [
       card_model.TroopCard(
@@ -838,16 +852,17 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     energyRatioNotifier.value = currentEnergy / maxEnergy;
   }
 
-  void spawnCreatureAndAttack(card_model.TroopCard cardData) {
-    final laneY = _pickLaneY();
-    final spawnPosition = _playerSpawnPoint(laneY);
+  void spawnCreatureAndAttack(card_model.TroopCard cardData,
+      {double? laneY}) {
+    final lane = laneY ?? _pickLaneY();
+    final spawnPosition = _playerSpawnPoint(lane);
 
     final troop =
         TroopComponent(
             game: this,
             cardData: cardData,
             isOpponent: false,
-            laneY: laneY,
+            laneY: lane,
           )
           ..position = spawnPosition
           ..anchor = Anchor.center;
@@ -856,16 +871,16 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     add(troop);
   }
 
-  void spawnOpponentTroop(card_model.TroopCard cardData) {
-    final laneY = _pickLaneY();
-    final spawnPosition = _opponentSpawnPoint(laneY);
+  void spawnOpponentTroop(card_model.TroopCard cardData, {double? laneY}) {
+    final lane = laneY ?? _pickLaneY();
+    final spawnPosition = _opponentSpawnPoint(lane);
 
     final troop =
         TroopComponent(
             game: this,
             cardData: cardData,
             isOpponent: true,
-            laneY: laneY,
+            laneY: lane,
           )
           ..position = spawnPosition
           ..anchor = Anchor.center
@@ -1122,62 +1137,6 @@ class PlaygroundScreen extends StatefulWidget {
 
   @override
   State<PlaygroundScreen> createState() => _PlaygroundScreenState();
-}
-
-class BotController {
-  BotController({
-    required this.game,
-    required List<card_model.TroopCard> troopDeck,
-    this.minDecisionInterval = 3.0,
-    this.maxDecisionInterval = 5.0,
-  })  : _troopDeck = List<card_model.TroopCard>.from(troopDeck),
-        _decisionTimer = 0 {
-    _resetTimer();
-  }
-
-  final CajuPlaygroundGame game;
-  final double minDecisionInterval;
-  final double maxDecisionInterval;
-  final List<card_model.TroopCard> _troopDeck;
-  double _decisionTimer;
-  int _nextTroopIndex = 0;
-  final math.Random _random = math.Random();
-
-  void update(double dt) {
-    if (!game.isSimulationRunning || _troopDeck.isEmpty) {
-      return;
-    }
-
-    if (game.outcomeNotifier.value != null) {
-      return;
-    }
-
-    _decisionTimer -= dt;
-    if (_decisionTimer > 0) {
-      return;
-    }
-
-    _deployTroop();
-    _resetTimer();
-  }
-
-  void reset() {
-    _decisionTimer = 0;
-    _nextTroopIndex = 0;
-    _resetTimer();
-  }
-
-  void _resetTimer() {
-    final intervalRange = math.max(0, maxDecisionInterval - minDecisionInterval);
-    final jitter = intervalRange == 0 ? 0 : _random.nextDouble() * intervalRange;
-    _decisionTimer = minDecisionInterval + jitter;
-  }
-
-  void _deployTroop() {
-    final card = _troopDeck[_nextTroopIndex % _troopDeck.length];
-    _nextTroopIndex = (_nextTroopIndex + 1) % _troopDeck.length;
-    game.spawnOpponentTroop(card);
-  }
 }
 
 class _PlaygroundScreenState extends State<PlaygroundScreen> {
