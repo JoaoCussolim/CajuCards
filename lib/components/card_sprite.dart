@@ -1,11 +1,11 @@
-import 'dart:async';
 import 'dart:ui';
 
-import 'package:flame/components.dart';
-import 'package:flame/events.dart';
-import 'package:flutter/material.dart';
 import 'package:cajucards/models/card.dart' as card_model;
 import 'package:cajucards/screens/playground.dart';
+import 'package:flame/components.dart';
+import 'package:flame/events.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 
 final Vector2 cardSize = Vector2(100, 140);
 
@@ -28,22 +28,55 @@ class CardSprite extends PositionComponent with TapCallbacks {
     final borderPath = '$basePath/border/${card.rarity}.png';
     final characterPath = '$basePath/${card.spritePath}';
 
-    final synergyBackground = SpriteComponent(
-      sprite: await Sprite.load(backgroundPath),
-      size: size,
-    );
+    final backgroundSprite = await _loadSpriteOrNull(backgroundPath);
+    final borderSprite = await _loadSpriteOrNull(borderPath);
+    final characterSprite = await _loadSpriteOrNull(characterPath);
 
-    final rarityBorder = SpriteComponent(
-      sprite: await Sprite.load(borderPath),
-      size: size,
-    );
+    if (backgroundSprite != null) {
+      add(
+        SpriteComponent(
+          sprite: backgroundSprite,
+          size: size,
+        ),
+      );
+    } else {
+      add(
+        RectangleComponent(
+          size: size,
+          paint: Paint()..color = Colors.black.withOpacity(0.65),
+        ),
+      );
+    }
 
-    final characterSprite = SpriteComponent(
-      sprite: await Sprite.load(characterPath),
-      size: size * 0.7,
-      anchor: Anchor.center,
-      position: size / 2,
-    );
+    if (characterSprite != null) {
+      add(
+        SpriteComponent(
+          sprite: characterSprite,
+          size: size * 0.7,
+          anchor: Anchor.center,
+          position: size / 2,
+        ),
+      );
+    }
+
+    if (borderSprite != null) {
+      add(
+        SpriteComponent(
+          sprite: borderSprite,
+          size: size,
+        ),
+      );
+    } else {
+      add(
+        RectangleComponent(
+          size: size,
+          paint: Paint()
+            ..color = Colors.white.withOpacity(0.3)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 3,
+        ),
+      );
+    }
 
     final textStyle = TextPaint(
       style: const TextStyle(
@@ -63,9 +96,6 @@ class CardSprite extends PositionComponent with TapCallbacks {
       position: Vector2(size.x * 0.26, size.y * 0.23),
     );
 
-    add(synergyBackground);
-    add(characterSprite);
-    add(rarityBorder);
     add(costText);
 
     _selectionOutline = RectangleComponent(
@@ -92,13 +122,6 @@ class CardSprite extends PositionComponent with TapCallbacks {
       return;
     }
 
-    if (card is card_model.BiomeCard) {
-      game.currentEnergy -= card.chestnutCost;
-      unawaited(game.applyBackgroundBiome(card.synergy));
-      print('Aplicando bioma: ${card.name}');
-      return;
-    }
-
     if (card is card_model.SpellCard) {
       final spellCard = card as card_model.SpellCard;
       game.prepareSpell(spellCard, this);
@@ -107,7 +130,7 @@ class CardSprite extends PositionComponent with TapCallbacks {
     }
 
     if (card is! card_model.TroopCard) {
-      print('Tipo de carta desconhecido: ${card.type}');
+      debugPrint('Carta não suportada: ${card.type} (${card.name})');
       return;
     }
 
@@ -127,5 +150,15 @@ class CardSprite extends PositionComponent with TapCallbacks {
 
   void setSelected(bool selected) {
     _selectionOutline.opacity = selected ? 1 : 0;
+  }
+
+  Future<Sprite?> _loadSpriteOrNull(String path) async {
+    try {
+      return await Sprite.load(path);
+    } catch (error, stackTrace) {
+      debugPrint('Falha ao carregar sprite "$path": $error');
+      debugPrint('$stackTrace');
+      return null;
+    }
   }
 }
