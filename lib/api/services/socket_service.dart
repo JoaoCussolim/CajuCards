@@ -181,6 +181,19 @@ class SocketService with ChangeNotifier {
     }
   }
 
+  /// Finaliza uma partida em andamento e retorna ao estado ocioso.
+  void leaveCurrentMatch() {
+    if (_socket?.connected ?? false) {
+      _socket!.emit('leaveMatch');
+    }
+
+    if (_status != MatchmakingStatus.idle) {
+      _status = MatchmakingStatus.idle;
+      _gameState = null;
+      notifyListeners();
+    }
+  }
+
   /// Envia a intenção de jogar uma carta para o servidor.
   void playCard(String cardId, double positionX, double positionY) {
     if (status != MatchmakingStatus.inMatch || _gameState == null) return;

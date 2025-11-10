@@ -406,7 +406,7 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     final dividerHeight = size.y * 0.82;
 
     final groundSprite = await Sprite.load('assets/images/WoodBasic.png');
-    final towerSprite = await Sprite.load('images/sprites/tower.png');
+    final towerSprite = await Sprite.load('assets/images/sprites/tower.png');
 
     _defaultPlayerBackgroundSprite = groundSprite;
     backgroundLayer = SpriteComponent(

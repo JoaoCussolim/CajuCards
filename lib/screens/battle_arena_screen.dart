@@ -4,6 +4,7 @@ import 'package:cajucards/models/card.dart' as card_model;
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 
+import 'battle_screen.dart';
 import 'playground.dart';
 
 class BattleArenaScreen extends StatefulWidget {
@@ -38,6 +39,7 @@ class BattleArenaScreen extends StatefulWidget {
 class _BattleArenaScreenState extends State<BattleArenaScreen> {
   late final CajuPlaygroundGame _game;
   bool _started = false;
+  bool _exitingToLobby = false;
 
   @override
   void initState() {
@@ -63,65 +65,92 @@ class _BattleArenaScreenState extends State<BattleArenaScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          GameWidget(game: _game),
-          ValueListenableBuilder<bool>(
-            valueListenable: _game.readinessNotifier,
-            builder: (context, ready, _) {
-              if (ready) {
-                return const SizedBox.shrink();
-              }
+    return WillPopScope(
+      onWillPop: _handleWillPop,
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            GameWidget(game: _game),
+            ValueListenableBuilder<bool>(
+              valueListenable: _game.readinessNotifier,
+              builder: (context, ready, _) {
+                if (ready) {
+                  return const SizedBox.shrink();
+                }
 
-              return Container(
-                color: Colors.black87,
-                child: const Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CircularProgressIndicator(color: Colors.white),
-                      SizedBox(height: 16),
-                      Text(
-                        'Carregando batalha...',
-                        style: TextStyle(
-                          fontFamily: 'VT323',
-                          fontSize: 24,
-                          color: Colors.white,
+                return Container(
+                  color: Colors.black87,
+                  child: const Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircularProgressIndicator(color: Colors.white),
+                        SizedBox(height: 16),
+                        Text(
+                          'Carregando batalha...',
+                          style: TextStyle(
+                            fontFamily: 'VT323',
+                            fontSize: 24,
+                            color: Colors.white,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              );
-            },
-          ),
-          SafeArea(
-            child: Stack(
-              children: [
-                Align(
-                  alignment: Alignment.topLeft,
-                  child: _BackButton(onPressed: () => Navigator.pop(context)),
-                ),
-                Align(
-                  alignment: Alignment.topCenter,
-                  child: _BattleHud(game: _game),
-                ),
-                Align(
-                  alignment: Alignment.bottomLeft,
-                  child: _EnergyMeter(game: _game),
-                ),
-                Align(
-                  alignment: Alignment.bottomRight,
-                  child: _ShopPanel(game: _game),
-                ),
-              ],
+                );
+              },
             ),
-          ),
-        ],
+            SafeArea(
+              child: Stack(
+                children: [
+                  Align(
+                    alignment: Alignment.topLeft,
+                    child: _BackButton(onPressed: _leaveToLobby),
+                  ),
+                  Align(
+                    alignment: Alignment.topCenter,
+                    child: _BattleHud(game: _game),
+                  ),
+                  Align(
+                    alignment: Alignment.bottomLeft,
+                    child: _EnergyMeter(game: _game),
+                  ),
+                  Align(
+                    alignment: Alignment.bottomRight,
+                    child: _ShopPanel(game: _game),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  Future<bool> _handleWillPop() async {
+    _leaveToLobby();
+    return false;
+  }
+
+  void _leaveToLobby() {
+    if (_exitingToLobby || !mounted) {
+      return;
+    }
+
+    _exitingToLobby = true;
+    _game.stopSimulation();
+    _game.socketService?.leaveCurrentMatch();
+
+    Navigator.of(context).pushAndRemoveUntil(
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) => const BattleScreen(),
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
+      ),
+      (route) => false,
     );
   }
 }
