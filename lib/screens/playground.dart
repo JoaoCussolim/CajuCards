@@ -517,7 +517,7 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
       return;
     }
 
-    final spritePath = 'sprites/background/$synergy.png';
+    final spritePath = 'assets/images/sprites/background/$synergy.png';
 
     try {
       final newSprite = await loadSprite(spritePath);

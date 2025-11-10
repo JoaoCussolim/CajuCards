@@ -21,7 +21,7 @@ class CardSprite extends PositionComponent with TapCallbacks {
   Future<void> onLoad() async {
     super.onLoad();
 
-    const basePath = 'sprites';
+    const basePath = 'assets/images/sprites';
     final backgroundPath = '$basePath/background/${card.synergy}.png';
     final borderPath = '$basePath/border/${card.rarity}.png';
     final characterPath = '$basePath/${card.spritePath}';
