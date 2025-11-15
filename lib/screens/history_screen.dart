@@ -1,11 +1,14 @@
+// lib/screens/history_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cajucards/providers/player_provider.dart';
 import 'package:cajucards/models/player.dart';
+import 'package:intl/intl.dart'; // Importe para formatação de data
 import 'battle_screen.dart';
 import 'shop_screen.dart';
 
-// A tela principal (HistoryScreen) continua igual, já estava certa.
+// A tela principal (HistoryScreen) continua igual
 class HistoryScreen extends StatelessWidget {
   const HistoryScreen({super.key});
 
@@ -69,6 +72,7 @@ class HistoryScreen extends StatelessWidget {
                 ],
               ),
             ),
+            // O _MatchHistoryList agora buscará os dados
             const Expanded(child: _MatchHistoryList()),
             const _BottomNavBar(),
           ],
@@ -78,7 +82,7 @@ class HistoryScreen extends StatelessWidget {
   }
 }
 
-// O _TopBar também já estava ok.
+// O _TopBar não muda.
 class _TopBar extends StatelessWidget {
   final String playerName;
   final int coins;
@@ -87,6 +91,7 @@ class _TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // ... (código idêntico ao original)
     return Center(
       child: SizedBox(
         width: MediaQuery.of(context).size.width * 0.85,
@@ -131,33 +136,107 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-// _MatchHistoryList também estava ok.
-class _MatchHistoryList extends StatelessWidget {
+// MODIFICAÇÃO: Convertido para StatefulWidget para buscar dados
+class _MatchHistoryList extends StatefulWidget {
   const _MatchHistoryList({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return ListView.builder(
-      padding: EdgeInsets.zero,
-      itemCount: 3,
-      itemBuilder: (context, index) {
-        final List<Map<String, dynamic>> matchData = [
-    
-        ];
+  State<_MatchHistoryList> createState() => _MatchHistoryListState();
+}
 
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 16.0),
-          child: _MatchHistoryCard(
-            opponentName: matchData[index]['opponent'],
-            result: matchData[index]['result'],
-            date: matchData[index]['date'],
-          ),
+class _MatchHistoryListState extends State<_MatchHistoryList> {
+  @override
+  void initState() {
+    super.initState();
+    // Dispara a busca pelo histórico assim que o widget for construído
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Verifica se o provider está montado antes de chamar
+      if (mounted) {
+        Provider.of<PlayerProvider>(context, listen: false).fetchMatchHistory();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Consome o PlayerProvider para obter os estados de histórico
+    return Consumer<PlayerProvider>(
+      builder: (context, provider, child) {
+        // 1. Estado de Carregamento
+        if (provider.isLoadingHistory) {
+          return const Center(
+            child: CircularProgressIndicator(color: Colors.white),
+          );
+        }
+
+        // 2. Estado de Erro
+        if (provider.historyError != null) {
+          return Center(
+            child: Text(
+              provider.historyError!,
+              style: const TextStyle(
+                color: Colors.white,
+                fontFamily: 'VT323',
+                fontSize: 24,
+              ),
+            ),
+          );
+        }
+
+        // 3. Estado de Lista Vazia (Conforme solicitado)
+        if (provider.matches.isEmpty) {
+          return const Center(
+            child: Text(
+              'Sem registros de partidas',
+              style: TextStyle(
+                color: Colors.white,
+                fontFamily: 'VT323',
+                fontSize: 24,
+              ),
+            ),
+          );
+        }
+
+        // 4. Estado de Sucesso (Lista Cheia)
+        // Precisamos do ID do jogador logado para saber quem é o oponente
+        final String currentUserId = provider.player!.id; // Assumindo que Player tem 'id'
+        final DateFormat formatter = DateFormat('dd/MM/yyyy'); // Formatador de data
+
+        return ListView.builder(
+          padding: EdgeInsets.zero,
+          itemCount: provider.matches.length, // Usa o tamanho real da lista
+          itemBuilder: (context, index) {
+            
+            final match = provider.matches[index];
+
+            // Lógica para determinar oponente e resultado
+            final bool isPlayer1 = match.player1.id == currentUserId;
+            final bool isWinner = match.winner.id == currentUserId;
+
+            final String opponentName =
+                isPlayer1 ? match.player2.username : match.player1.username;
+            final String result = isWinner ? "Vitória" : "Derrota";
+            
+            // Formata a data
+            final String date = formatter.format(match.matchDate);
+
+            // Usa o _MatchHistoryCard original, passando os dados dinâmicos
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 16.0),
+              child: _MatchHistoryCard(
+                opponentName: opponentName,
+                result: result,
+                date: date,
+              ),
+            );
+          },
         );
       },
     );
   }
 }
 
+// _MatchHistoryCard NÃO MUDA (Conforme solicitado)
 class _MatchHistoryCard extends StatelessWidget {
   final String opponentName;
   final String result; // "Vitória" ou "Derrota"
@@ -197,7 +276,7 @@ class _MatchHistoryCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center, // Centraliza verticalmente
             children: [
               Text(
-                opponentName,
+                opponentName, // <-- DADO DINÂMICO
                 style: const TextStyle(
                   fontFamily: 'VT323',
                   fontSize: 24,
@@ -205,6 +284,7 @@ class _MatchHistoryCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
+              // Cartas estáticas mantidas, conforme API atual
               Row(
                 children: List.generate(
                   5,
@@ -226,7 +306,7 @@ class _MatchHistoryCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center, // Centraliza verticalmente
             children: [
               Text(
-                result,
+                result, // <-- DADO DINÂMICO
                 style: TextStyle(
                   fontFamily: 'VT323',
                   fontSize: 28,
@@ -236,7 +316,7 @@ class _MatchHistoryCard extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                date,
+                date, // <-- DADO DINÂMICO
                 style: const TextStyle(
                   fontFamily: 'VT323',
                   fontSize: 22,
@@ -251,13 +331,13 @@ class _MatchHistoryCard extends StatelessWidget {
   }
 }
 
-
-// O _BottomNavBar já estava ok
+// O _BottomNavBar não muda.
 class _BottomNavBar extends StatelessWidget {
   const _BottomNavBar();
 
   @override
   Widget build(BuildContext context) {
+    // ... (código idêntico ao original)
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10.0),
       child: Row(
@@ -305,6 +385,7 @@ class _BottomNavBar extends StatelessWidget {
   }
 }
 
+// O _NavItem não muda.
 class _NavItem extends StatelessWidget {
   final String iconPath;
   final String label;
@@ -320,6 +401,7 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // ... (código idêntico ao original)
     final color =
         isSelected ? const Color(0xFFF98B25) : const Color(0xFF8B5E3C);
     return GestureDetector(
