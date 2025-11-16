@@ -1,3 +1,5 @@
+import 'package:cajucards/api/api_client.dart';
+import 'package:cajucards/api/services/match_history_service.dart';
 import 'package:cajucards/components/card_sprite.dart';
 import 'package:cajucards/models/card.dart' as card_model;
 import 'package:cajucards/screens/battle_screen.dart';
@@ -27,6 +29,7 @@ class BattleArenaScreen extends StatefulWidget {
 class _BattleArenaScreenState extends State<BattleArenaScreen> {
   late final CajuPlaygroundGame _game;
   bool _started = false;
+  final matchHistoryService = MatchHistoryService(ApiClient());
 
   @override
   void initState() {
@@ -34,8 +37,20 @@ class _BattleArenaScreenState extends State<BattleArenaScreen> {
     _game = widget._gameBuilder();
     _game.readinessNotifier.addListener(_handleReadinessChange);
 
-    _game.onEnd = (reason, duration) {
+    _game.onEnd = (reason, duration) async {
       if (!mounted) return;
+
+      final result = switch (reason) {
+        EndReason.playerVictory => 'win',
+        EndReason.playerDefeat => 'loss',
+        EndReason.draw => 'draw',
+      };
+
+      try {
+        await matchHistoryService.postBotMatchResult(result: result);
+      } catch (e) {
+        debugPrint('Falha ao salvar histórico de partida: $e');
+      }
 
       Widget target;
       if (reason == EndReason.playerVictory) {
