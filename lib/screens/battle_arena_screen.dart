@@ -1,5 +1,8 @@
 import 'package:cajucards/components/card_sprite.dart';
 import 'package:cajucards/models/card.dart' as card_model;
+import 'package:cajucards/screens/battle_screen.dart';
+import 'package:cajucards/screens/defeat_screen.dart';
+import 'package:cajucards/screens/victory_screen.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 
@@ -12,10 +15,7 @@ class BattleArenaScreen extends StatefulWidget {
   }) : _gameBuilder = gameBuilder;
 
   factory BattleArenaScreen.bot({Key? key}) {
-    return BattleArenaScreen._(
-      gameBuilder: CajuPlaygroundGame.bot,
-      key: key,
-    );
+    return BattleArenaScreen._(gameBuilder: CajuPlaygroundGame.bot, key: key);
   }
 
   final CajuPlaygroundGame Function() _gameBuilder;
@@ -33,6 +33,25 @@ class _BattleArenaScreenState extends State<BattleArenaScreen> {
     super.initState();
     _game = widget._gameBuilder();
     _game.readinessNotifier.addListener(_handleReadinessChange);
+
+    _game.onEnd = (reason, duration) {
+      if (!mounted) return;
+
+      Widget target;
+      if (reason == EndReason.playerVictory) {
+        target = const VictoryScreen();
+      } else {
+        target = const DefeatScreen();
+      }
+
+      Navigator.of(
+        context,
+      ).pushReplacement(MaterialPageRoute(builder: (_) => target));
+    };
+
+    if (_game.readinessNotifier.value) {
+      _handleReadinessChange();
+    }
   }
 
   void _handleReadinessChange() {
@@ -45,6 +64,7 @@ class _BattleArenaScreenState extends State<BattleArenaScreen> {
   @override
   void dispose() {
     _game.readinessNotifier.removeListener(_handleReadinessChange);
+    _game.onEnd = null;
     _game.stopSimulation();
     super.dispose();
   }
@@ -91,7 +111,11 @@ class _BattleArenaScreenState extends State<BattleArenaScreen> {
               children: [
                 Align(
                   alignment: Alignment.topLeft,
-                  child: _BackButton(onPressed: () => Navigator.pop(context)),
+                  child: _BackButton(
+                    onPressed: () => Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(builder: (_) => BattleScreen()),
+                    ),
+                  ),
                 ),
                 Align(
                   alignment: Alignment.topCenter,
@@ -100,10 +124,6 @@ class _BattleArenaScreenState extends State<BattleArenaScreen> {
                 Align(
                   alignment: Alignment.bottomLeft,
                   child: _EnergyMeter(game: _game),
-                ),
-                Align(
-                  alignment: Alignment.bottomRight,
-                  child: _ShopPanel(game: _game),
                 ),
               ],
             ),
@@ -264,9 +284,7 @@ class _HealthMeter extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           child: Container(
             height: 14,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.18),
-            ),
+            decoration: BoxDecoration(color: Colors.white.withOpacity(0.18)),
             child: FractionallySizedBox(
               alignment: alignment,
               widthFactor: clampRatio,
@@ -445,10 +463,7 @@ class _ShopPanel extends StatelessWidget {
                       ),
                       child: const Text(
                         'Reroll (1 energia)',
-                        style: TextStyle(
-                          fontFamily: 'VT323',
-                          fontSize: 18,
-                        ),
+                        style: TextStyle(fontFamily: 'VT323', fontSize: 18),
                       ),
                     );
                   },

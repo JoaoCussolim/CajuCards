@@ -5,6 +5,7 @@ import 'package:cajucards/api/services/card_service.dart';
 import 'package:cajucards/api/services/socket_service.dart';
 import 'package:cajucards/components/card_sprite.dart';
 import 'package:cajucards/components/creature_sprite.dart';
+import 'package:cajucards/screens/defeat_screen.dart';
 import 'package:flame/components.dart';
 import 'package:flame/effects.dart';
 import 'package:flame/events.dart';
@@ -70,6 +71,15 @@ class TroopComponent extends CreatureSprite {
 
   Vector2 get _enemyTowerFront =>
       isOpponent ? game.playerTowerFront : game.opponentTowerFront;
+
+  @override
+  Future<void> onLoad() async {
+    await super.onLoad();
+
+    if (isOpponent) {
+      flipHorizontally();
+    }
+  }
 
   void tick(double dt, Iterable<TroopComponent> enemies) {
     if (isRemoved || isDying || isDead) {
@@ -284,6 +294,7 @@ enum EndReason { playerVictory, playerDefeat, draw }
 
 class CajuPlaygroundGame extends FlameGame with TapCallbacks {
   static const double handBottomInset = 80;
+  final readinessNotifier = ValueNotifier<bool>(false);
 
   CajuPlaygroundGame({this.socketService, this.isBotMode = false})
     : _simulationRunning = false;
@@ -320,7 +331,6 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
   final ValueNotifier<bool> simulationRunningNotifier = ValueNotifier<bool>(
     false,
   );
-  final ValueNotifier<bool> readinessNotifier = ValueNotifier<bool>(false);
   final int shopSize = 3;
   late final TowerComponent playerTowerComponent;
   late final TowerComponent opponentTowerComponent;
@@ -403,9 +413,11 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     _initialized = true;
     readinessNotifier.value = true;
 
+    // Prepara estado inicial
     resetSimulation();
 
-    if (!isBotMode) {
+    // Começa a luta automaticamente no Playground normal
+    if (isBotMode) {
       startSimulation();
     }
   }
@@ -415,6 +427,7 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
 
     final groundSprite = await Sprite.load('assets/images/WoodBasic.png');
     final towerSprite = await Sprite.load('images/sprites/tower.png');
+    final opptowerSprite = await Sprite.load('images/sprites/opptower.png');
 
     _defaultPlayerBackgroundSprite = groundSprite;
     backgroundLayer = SpriteComponent(
@@ -495,7 +508,7 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
 
     // Torre do oponente (direita)
     opponentTowerComponent = TowerComponent(
-      sprite: towerSprite,
+      sprite: opptowerSprite,
       size: towerSize,
       position: Vector2(size.x, size.y / 2),
       anchor: Anchor.centerRight,
@@ -543,12 +556,18 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
   void update(double dt) {
     super.update(dt);
 
+    // Se a simulação não começou, não avança tempo de luta nem bot
+    if (!_simulationRunning) {
+      return;
+    }
+
     if (currentEnergy < maxEnergy) {
       currentEnergy += energyPerSecond * dt;
       if (currentEnergy > maxEnergy) {
         currentEnergy = maxEnergy;
       }
     }
+
     matchTimeSeconds += dt;
     matchTimeNotifier.value = matchTimeSeconds;
     energyRatioNotifier.value = currentEnergy / maxEnergy;
@@ -559,14 +578,6 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
 
   @override
   void onRemove() {
-    energyRatioNotifier.dispose();
-    matchTimeNotifier.dispose();
-    shopCardsNotifier.dispose();
-    backgroundSynergyNotifier.dispose();
-    playerHealthRatioNotifier.dispose();
-    opponentHealthRatioNotifier.dispose();
-    simulationRunningNotifier.dispose();
-    readinessNotifier.dispose();
     super.onRemove();
   }
 
@@ -574,9 +585,39 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
     if (!_initialized || _simulationRunning) {
       return;
     }
+    print('startSimulation() chamado');
     _clearSpellSelection();
     _simulationRunning = true;
     simulationRunningNotifier.value = true;
+    _botController?.reset();
+  }
+
+  void resetSimulation() {
+    if (!_initialized) {
+      return;
+    }
+
+    print('resetSimulation() chamado');
+
+    _simulationRunning = false;
+    simulationRunningNotifier.value = false;
+
+    _clearSpellSelection();
+    _endFired = false;
+
+    currentEnergy = 0;
+    matchTimeSeconds = 0;
+    playerHealth = maxHealth;
+    opponentHealth = maxHealth;
+
+    energyRatioNotifier.value = 0;
+    matchTimeNotifier.value = 0;
+    playerHealthRatioNotifier.value = 1;
+    opponentHealthRatioNotifier.value = 1;
+
+    _clearBattlefield();
+    resetBackgroundBiome();
+    _populateShop();
     _botController?.reset();
   }
 
@@ -600,30 +641,6 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
       reason,
       Duration(milliseconds: (matchTimeSeconds * 1000).round()),
     );
-  }
-
-  void resetSimulation() {
-    if (!_initialized) {
-      return;
-    }
-
-    stopSimulation();
-    _clearSpellSelection();
-
-    _endFired = false;
-
-    currentEnergy = 0;
-    matchTimeSeconds = 0;
-    playerHealth = maxHealth;
-    opponentHealth = maxHealth;
-    energyRatioNotifier.value = 0;
-    matchTimeNotifier.value = 0;
-    playerHealthRatioNotifier.value = 1;
-    opponentHealthRatioNotifier.value = 1;
-    _clearBattlefield();
-    resetBackgroundBiome();
-    _populateShop();
-    _botController?.reset();
   }
 
   void applyBaseDamage({required bool toOpponent, required double amount}) {
@@ -749,8 +766,7 @@ class CajuPlaygroundGame extends FlameGame with TapCallbacks {
             laneY: laneY,
           )
           ..position = spawnPosition
-          ..anchor = Anchor.center
-          ..flipHorizontally();
+          ..anchor = Anchor.center;
 
     _trackOpponentTroop(troop, cardData);
     add(troop);
@@ -1011,49 +1027,40 @@ class _ScheduledPlay {
 }
 
 class BotController {
-  BotController({required this.game})
-    : _schedule = [],
-      _elapsedTime = 0,
-      _nextPlayIndex = 0 {
-    _initializeSchedule();
-  }
+  BotController({required this.game});
 
   final CajuPlaygroundGame game;
-  final List<_ScheduledPlay> _schedule;
-  double _elapsedTime;
-  int _nextPlayIndex;
+  final math.Random _random = math.Random();
+
+  double _spawnTimer = 0;
+
+  List<card_model.TroopCard> get _troopCards =>
+      game._allCards.whereType<card_model.TroopCard>().toList();
 
   void update(double dt) {
-    _elapsedTime += dt;
+    // Não faz nada se a simulação não estiver rolando
+    if (!game.isSimulationRunning) return;
 
-    while (_nextPlayIndex < _schedule.length &&
-        _elapsedTime >= _schedule[_nextPlayIndex].timeOffset) {
-      final play = _schedule[_nextPlayIndex];
-      game.spawnOpponentTroop(play.card);
-      _nextPlayIndex += 1;
+    // Se alguém já morreu, não continua jogando
+    if (game.playerHealth <= 0 || game.opponentHealth <= 0) return;
+
+    _spawnTimer += dt;
+
+    // Tenta jogar uma tropa a cada 3 segundos
+    if (_spawnTimer < 6.0) {
+      return;
     }
+    _spawnTimer = 0;
+
+    final troops = _troopCards;
+    if (troops.isEmpty) return;
+
+    final card = troops[_random.nextInt(troops.length)];
+    game.spawnOpponentTroop(card);
   }
 
   void reset() {
-    _elapsedTime = 0;
-    _nextPlayIndex = 0;
-  }
-
-  void _initializeSchedule() {
-    final troopCards = game._allCards
-        .whereType<card_model.TroopCard>()
-        .toList();
-
-    if (troopCards.length < 2) {
-      return;
-    }
-
-    _schedule
-      ..clear()
-      ..addAll([
-        _ScheduledPlay(timeOffset: 3.0, card: troopCards[0]),
-        _ScheduledPlay(timeOffset: 9.0, card: troopCards[1]),
-      ]);
+    _spawnTimer = 0;
   }
 }
 
@@ -1069,11 +1076,13 @@ class _PlaygroundScreenState extends State<PlaygroundScreen> {
     _game.onEnd = (reason, duration) {
       if (!mounted) return;
       if (reason == EndReason.playerVictory) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => VictoryScreen(),
-          ),
-        );
+        Navigator.of(
+          context,
+        ).pushReplacement(MaterialPageRoute(builder: (_) => VictoryScreen()));
+      } else {
+        Navigator.of(
+          context,
+        ).pushReplacement(MaterialPageRoute(builder: (_) => DefeatScreen()));
       }
     };
     // _socketService.connectAndListen(); // Podemos desabilitar para a simulação

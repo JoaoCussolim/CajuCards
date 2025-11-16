@@ -284,19 +284,6 @@ class _MatchHistoryCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              // Cartas estáticas mantidas, conforme API atual
-              Row(
-                children: List.generate(
-                  5,
-                  (index) => Padding(
-                    padding: const EdgeInsets.only(right: 8.0),
-                    child: Image.asset(
-                      'assets/images/cardPlutonio.png',
-                      width: 45,
-                    ),
-                  ),
-                ),
-              ),
             ],
           ),
 

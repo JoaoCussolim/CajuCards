@@ -37,6 +37,9 @@ class _MatchmakingScreenState extends State<MatchmakingScreen>
   Timer? _fallbackToBotTimer;
   bool _navigatedToMatch = false;
 
+  // 🔹 Referência fixa pro SocketService (sem depender de context no dispose)
+  late SocketService _socketService;
+
   @override
   void initState() {
     super.initState();
@@ -53,63 +56,58 @@ class _MatchmakingScreenState extends State<MatchmakingScreen>
     _pulsarController.repeat(reverse: true);
 
     _dotsTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
-      if (mounted) {
-        setState(() {
-          if (_loadingDots.length < 3) {
-            _loadingDots += '.';
-          } else {
-            _loadingDots = '';
-          }
-        });
-      }
+      if (!mounted) return; // proteção extra
+      setState(() {
+        if (_loadingDots.length < 3) {
+          _loadingDots += '.';
+        } else {
+          _loadingDots = '';
+        }
+      });
     });
 
     _currentPhraseIndex = Random().nextInt(_phrases.length);
 
     _phrasesTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
-      if (mounted) {
-        setState(() {
-          _currentPhraseIndex = (_currentPhraseIndex + 1) % _phrases.length;
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _currentPhraseIndex = (_currentPhraseIndex + 1) % _phrases.length;
+      });
     });
-
-    // --- REMOVIDO ---
-    // O Future.delayed de 10 segundos foi removido.
-    // A navegação agora é controlada pelo Consumer no método build().
-    // --- FIM DA REMOÇÃO ---
 
     _startFallbackTimer();
   }
 
   @override
-  void dispose() {
-    // --- LÓGICA DE CANCELAMENTO ADICIONADA ---
-    // Se o usuário sair desta tela (ex: apertar "Voltar")
-    // E ele ainda estiver procurando, cancele a busca!
-    
-    // Usamos 'context.read' porque estamos no dispose
-    final socketService = context.read<SocketService>();
-    if (socketService.status == MatchmakingStatus.searching) {
-      socketService.cancelFindMatch(); //
-    }
-    // --- FIM DA LÓGICA ---
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Aqui ainda é seguro usar context.read
+    _socketService = context.read<SocketService>();
+  }
 
+  @override
+  void dispose() {
+    // 1) Cancela timers/animadores
     _pulsarController.dispose();
     _dotsTimer?.cancel();
     _phrasesTimer?.cancel();
     _fallbackToBotTimer?.cancel();
+
+    // 2) Usa a referência salva do SocketService (sem context.read)
+    if (_socketService.status == MatchmakingStatus.searching) {
+      _socketService.cancelFindMatch();
+    }
+
     super.dispose();
   }
 
   void _startFallbackTimer() {
     _fallbackToBotTimer?.cancel();
     _fallbackToBotTimer = Timer(const Duration(seconds: 8), () {
-      if (!mounted) {
-        return;
-      }
-      final socketService = context.read<SocketService>();
-      if (socketService.status == MatchmakingStatus.searching) {
+      if (!mounted) return;
+
+      // Usa a instância salva
+      if (_socketService.status == MatchmakingStatus.searching) {
         _navigateToBattle(vsBot: true);
       }
     });
@@ -123,9 +121,8 @@ class _MatchmakingScreenState extends State<MatchmakingScreen>
     _navigatedToMatch = true;
     _fallbackToBotTimer?.cancel();
 
-    final socketService = context.read<SocketService>();
-    if (vsBot && socketService.status == MatchmakingStatus.searching) {
-      socketService.cancelFindMatch();
+    if (vsBot && _socketService.status == MatchmakingStatus.searching) {
+      _socketService.cancelFindMatch();
     }
 
     Navigator.pushReplacement(
@@ -148,25 +145,16 @@ class _MatchmakingScreenState extends State<MatchmakingScreen>
         return 'Cancelado$_loadingDots';
       case MatchmakingStatus.error:
         return 'Erro ao conectar$_loadingDots';
-      default:
-        return 'Carregando$_loadingDots';
     }
   }
-  // --- FIM DO MÉTODO ---
 
   @override
   Widget build(BuildContext context) {
     const double tamanhoCastanha = 150.0;
 
-    // --- WIDGET CONSUMER ADICIONADO ---
-    // Este widget "escuta" o SocketService e reconstrói
-    // a UI quando o status da partida mudar.
     return Consumer<SocketService>(
       builder: (context, socketService, child) {
-        
-        // --- LÓGICA DE NAVEGAÇÃO ADICIONADA ---
         if (socketService.status == MatchmakingStatus.inMatch) {
-          // Usamos addPostFrameCallback para navegar *após* o build
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _navigateToBattle(vsBot: false);
           });
@@ -175,22 +163,18 @@ class _MatchmakingScreenState extends State<MatchmakingScreen>
             _navigateToBattle(vsBot: true);
           });
         }
-        // --- FIM DA LÓGICA ---
 
-        // O Scaffold e todo o resto da UI original
         return Scaffold(
           body: Stack(
             fit: StackFit.expand,
             children: [
-              // Imagem de fundo
               Image.asset('assets/images/WoodBasic.png', fit: BoxFit.cover),
 
-              // 1. Logo posicionada no topo
               SafeArea(
                 child: Align(
                   alignment: Alignment.topCenter,
                   child: Padding(
-                    padding: EdgeInsets.only(top: 10.0),
+                    padding: const EdgeInsets.only(top: 10.0),
                     child: Image.asset(
                       'assets/images/Logo.png',
                       width: MediaQuery.of(context).size.width * 0.6,
@@ -199,7 +183,6 @@ class _MatchmakingScreenState extends State<MatchmakingScreen>
                 ),
               ),
 
-              // 2. Caju e texto centralizados
               Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -212,14 +195,9 @@ class _MatchmakingScreenState extends State<MatchmakingScreen>
                           child: child,
                         );
                       },
-                      child: Image.asset(
-                        'assets/images/caju.png',
-                        width: 100,
-                      ),
+                      child: Image.asset('assets/images/caju.png', width: 100),
                     ),
                     const SizedBox(height: 20),
-                    // --- TEXTO MODIFICADO ---
-                    // Agora usa o método auxiliar para mostrar o status
                     Text(
                       _getTextoCarregamento(socketService.status),
                       style: const TextStyle(
@@ -228,12 +206,10 @@ class _MatchmakingScreenState extends State<MatchmakingScreen>
                         color: Color(0xFFDD7326),
                       ),
                     ),
-                    // --- FIM DA MODIFICAÇÃO ---
                   ],
                 ),
               ),
 
-              // Container de frases na parte inferior
               Positioned(
                 bottom: MediaQuery.of(context).size.height * 0.1,
                 left: 0,
@@ -267,7 +243,6 @@ class _MatchmakingScreenState extends State<MatchmakingScreen>
                 ),
               ),
 
-              // Castanhas nos cantos
               Positioned(
                 top: 10,
                 left: 10,
