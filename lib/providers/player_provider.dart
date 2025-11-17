@@ -136,4 +136,19 @@ class PlayerProvider with ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future<void> claimVictoryReward() async {
+    if (_player == null) return; 
+
+    try {
+      final Player updatedPlayer = await _userService.claimVictoryReward();
+      
+      _player = updatedPlayer;
+      
+      notifyListeners();
+
+    } catch (e) {
+      debugPrint('Erro ao resgatar recompensa da vitória: $e');
+    }
+  }
 }

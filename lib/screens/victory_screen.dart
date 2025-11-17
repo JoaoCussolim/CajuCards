@@ -1,6 +1,8 @@
 import 'package:cajucards/screens/battle_screen.dart';
 import 'package:flutter/material.dart';
 import 'dart:math'; // Usaremos sin e pi para a animação de onda
+import 'package:provider/provider.dart';
+import 'package:cajucards/providers/player_provider.dart';
 
 class VictoryScreen extends StatefulWidget {
   const VictoryScreen({super.key});
@@ -181,7 +183,7 @@ class _VictoryScreenState extends State<VictoryScreen>
         final time = (controller.value + phaseDelay) % 1.0;
         final yOffset =
             sin(time * 2 * pi) *
-            7.5; // Multiplica por 2*pi para um ciclo completo
+                7.5; // Multiplica por 2*pi para um ciclo completo
 
         return Transform.translate(offset: Offset(0, yOffset), child: child);
       },
@@ -204,7 +206,7 @@ class _VictoryScreenState extends State<VictoryScreen>
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: fontSize,
-            fontFamily: 'VT323',
+            fontFamily: 'VT33',
             foreground: Paint()
               ..style = PaintingStyle.stroke
               ..strokeWidth = strokeWidth
@@ -216,7 +218,7 @@ class _VictoryScreenState extends State<VictoryScreen>
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: fontSize,
-            fontFamily: 'VT323',
+            fontFamily: 'VT33',
             color: fillColor,
           ),
         ),
@@ -227,6 +229,10 @@ class _VictoryScreenState extends State<VictoryScreen>
   Widget _buildExitButton(BuildContext context) {
     return GestureDetector(
       onTap: () {
+        // 2. ADICIONAR CHAMADA DA LÓGICA ANTES DE NAVEGAR
+        Provider.of<PlayerProvider>(context, listen: false)
+            .claimVictoryReward();
+
         Navigator.pushReplacement(
           context,
           PageRouteBuilder(

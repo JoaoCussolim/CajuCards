@@ -28,4 +28,18 @@ class UserService {
       throw Exception('Falha ao adicionar o emote.');
     }
   }
+
+  Future<Player> claimVictoryReward() async {
+    final response = await _apiClient.post(
+      '/users/me/claim-victory',
+      body: {},
+    );
+
+    if (response.statusCode == 200) {
+      final decoded = json.decode(response.body);
+      return Player.fromJson(decoded['data']['user']);
+    } else {
+      throw Exception('Falha ao resgatar a recompensa da vitória.');
+    }
+  }
 }
