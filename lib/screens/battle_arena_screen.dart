@@ -1,12 +1,16 @@
 import 'package:cajucards/api/api_client.dart';
 import 'package:cajucards/api/services/match_history_service.dart';
+import 'package:cajucards/api/services/socket_service.dart';
 import 'package:cajucards/components/card_sprite.dart';
 import 'package:cajucards/models/card.dart' as card_model;
+import 'package:cajucards/models/emote.dart';
+import 'package:cajucards/providers/player_provider.dart';
 import 'package:cajucards/screens/battle_screen.dart';
 import 'package:cajucards/screens/defeat_screen.dart';
 import 'package:cajucards/screens/victory_screen.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import 'playground.dart';
 
@@ -139,6 +143,10 @@ class _BattleArenaScreenState extends State<BattleArenaScreen> {
                 Align(
                   alignment: Alignment.bottomLeft,
                   child: _EnergyMeter(game: _game),
+                ),
+                Align(
+                  alignment: Alignment.bottomRight,
+                  child: _EmoteButton(),
                 ),
               ],
             ),
@@ -379,6 +387,236 @@ class _EnergyMeter extends StatelessWidget {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _EmoteButton extends StatefulWidget {
+  @override
+  State<_EmoteButton> createState() => _EmoteButtonState();
+}
+
+class _EmoteButtonState extends State<_EmoteButton> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = context.read<PlayerProvider>();
+      if (provider.emotes.isEmpty && !provider.isLoadingEmotes) {
+        provider.fetchUserEmotes();
+      }
+    });
+  }
+
+  void _openEmoteSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.black87,
+      builder: (sheetContext) {
+        return const _EmotePicker();
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 20, bottom: 20),
+      child: Consumer<PlayerProvider>(
+        builder: (context, provider, _) {
+          final isLoading = provider.isLoadingEmotes;
+
+          return Stack(
+            alignment: Alignment.center,
+            children: [
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.45),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: Colors.white24),
+                ),
+                child: IconButton(
+                  iconSize: 56,
+                  icon: Image.asset('assets/images/emote_button.png'),
+                  onPressed: _openEmoteSheet,
+                ),
+              ),
+              if (isLoading)
+                const Positioned(
+                  right: 10,
+                  top: 10,
+                  child: SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _EmotePicker extends StatelessWidget {
+  const _EmotePicker();
+
+  void _sendEmote(BuildContext context, Emote emote) {
+    final socketService = context.read<SocketService>();
+    socketService.sendEmote(emote.id);
+    Navigator.of(context).pop();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Emote "${emote.name}" enviado!'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Consumer<PlayerProvider>(
+          builder: (context, provider, _) {
+            final emotes = provider.emotes;
+
+            if (provider.isLoadingEmotes && emotes.isEmpty) {
+              return const SizedBox(
+                height: 200,
+                child: Center(
+                  child: CircularProgressIndicator(color: Colors.white),
+                ),
+              );
+            }
+
+            if (provider.emotesError != null) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Não foi possível carregar seus emotes.',
+                    style: TextStyle(
+                      fontFamily: 'VT323',
+                      fontSize: 22,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    provider.emotesError!,
+                    style: const TextStyle(color: Colors.white70),
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    onPressed: provider.fetchUserEmotes,
+                    child: const Text('Tentar novamente'),
+                  ),
+                ],
+              );
+            }
+
+            if (emotes.isEmpty) {
+              return const SizedBox(
+                height: 160,
+                child: Center(
+                  child: Text(
+                    'Você ainda não possui emotes.',
+                    style: TextStyle(
+                      fontFamily: 'VT323',
+                      fontSize: 22,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Emotes disponíveis',
+                  style: TextStyle(
+                    fontFamily: 'VT323',
+                    fontSize: 26,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 260,
+                  child: SingleChildScrollView(
+                    child: Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        for (final emote in emotes)
+                          GestureDetector(
+                            onTap: () => _sendEmote(context, emote),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.08),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: Colors.white24),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(10),
+                                    child: Image.asset(
+                                      emote.spritePath,
+                                      width: 64,
+                                      height: 64,
+                                      errorBuilder: (context, error, stackTrace) {
+                                        return const Icon(Icons.emoji_emotions,
+                                            color: Colors.white54, size: 32);
+                                      },
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  emote.name,
+                                  style: const TextStyle(
+                                    fontFamily: 'VT323',
+                                    fontSize: 18,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (provider.isLoadingEmotes)
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }

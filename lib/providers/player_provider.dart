@@ -21,6 +21,10 @@ class PlayerProvider with ChangeNotifier {
   String? _buyChestError;
   Emote? _lastWonEmote;
 
+  List<Emote> _emotes = [];
+  bool _isLoadingEmotes = false;
+  String? _emotesError;
+
   // 4. Estados para controlar o histórico de partidas
   List<MatchHistoryItem> _matches = [];
   bool _isLoadingHistory = false;
@@ -45,6 +49,10 @@ class PlayerProvider with ChangeNotifier {
   List<MatchHistoryItem> get matches => _matches;
   bool get isLoadingHistory => _isLoadingHistory;
   String? get historyError => _historyError;
+
+  List<Emote> get emotes => _emotes;
+  bool get isLoadingEmotes => _isLoadingEmotes;
+  String? get emotesError => _emotesError;
 
 
   /// Busca os dados do jogador logado.
@@ -116,6 +124,23 @@ class PlayerProvider with ChangeNotifier {
   void clearBuyChestError() {
     _buyChestError = null;
     notifyListeners();
+  }
+
+  Future<void> fetchUserEmotes() async {
+    if (_isLoadingEmotes) return;
+
+    _isLoadingEmotes = true;
+    _emotesError = null;
+    notifyListeners();
+
+    try {
+      _emotes = await _userService.getUserEmotes();
+    } catch (e) {
+      _emotesError = e.toString().replaceFirst("Exception: ", "");
+    } finally {
+      _isLoadingEmotes = false;
+      notifyListeners();
+    }
   }
 
   // 7. NOVO MÉTODO: Buscar o histórico de partidas
