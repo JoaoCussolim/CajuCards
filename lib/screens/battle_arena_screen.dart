@@ -11,6 +11,7 @@ import 'package:cajucards/screens/victory_screen.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:async';
 
 import 'playground.dart';
 
@@ -34,6 +35,9 @@ class _BattleArenaScreenState extends State<BattleArenaScreen> {
   late final CajuPlaygroundGame _game;
   bool _started = false;
   final matchHistoryService = MatchHistoryService(ApiClient());
+
+  Emote? _lastEmote;
+  Timer? _emoteTimer;
 
   @override
   void initState() {
@@ -78,6 +82,20 @@ class _BattleArenaScreenState extends State<BattleArenaScreen> {
       _started = true;
       _game.startSimulation();
     }
+  }
+
+  void _showEmote(Emote emote) {
+    setState(() {
+      _lastEmote = emote;
+    });
+
+    _emoteTimer?.cancel();
+    _emoteTimer = Timer(const Duration(seconds: 2), () {
+      if (!mounted) return;
+      setState(() {
+        _lastEmote = null;
+      });
+    });
   }
 
   @override
@@ -144,10 +162,17 @@ class _BattleArenaScreenState extends State<BattleArenaScreen> {
                   alignment: Alignment.bottomLeft,
                   child: _EnergyMeter(game: _game),
                 ),
+
                 Align(
                   alignment: Alignment.bottomRight,
-                  child: _EmoteButton(),
+                  child: _EmoteButton(onEmoteSelected: _showEmote),
                 ),
+                if (_lastEmote != null)
+                  Positioned(
+                    left: 20, // perto da sua torre
+                    top: 160, // acima da torre / barra de energia (ajuste esse valor se quiser)
+                    child: _EmoteOverlay(emote: _lastEmote!),
+                  ),
               ],
             ),
           ),
@@ -259,6 +284,55 @@ class _BattleHud extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _EmoteOverlay extends StatelessWidget {
+  const _EmoteOverlay({required this.emote});
+
+  final Emote emote;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.65),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white24),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // imagem grande, estilo emote Clash Royale
+            Image.asset(
+              emote.spritePath,
+              width: 110,
+              height: 110,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) {
+                return const Icon(
+                  Icons.emoji_emotions,
+                  color: Colors.white70,
+                  size: 72,
+                );
+              },
+            ),
+            const SizedBox(height: 6),
+            Text(
+              emote.name,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontFamily: 'VT323',
+                fontSize: 22,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -393,6 +467,10 @@ class _EnergyMeter extends StatelessWidget {
 }
 
 class _EmoteButton extends StatefulWidget {
+  const _EmoteButton({required this.onEmoteSelected});
+
+  final ValueChanged<Emote> onEmoteSelected;
+
   @override
   State<_EmoteButton> createState() => _EmoteButtonState();
 }
@@ -414,7 +492,7 @@ class _EmoteButtonState extends State<_EmoteButton> {
       context: context,
       backgroundColor: Colors.black87,
       builder: (sheetContext) {
-        return const _EmotePicker();
+        return _EmotePicker(onEmoteSelected: widget.onEmoteSelected);
       },
     );
   }
@@ -436,10 +514,27 @@ class _EmoteButtonState extends State<_EmoteButton> {
                   borderRadius: BorderRadius.circular(18),
                   border: Border.all(color: Colors.white24),
                 ),
-                child: IconButton(
-                  iconSize: 56,
-                  icon: Image.asset('assets/images/emote_button.png'),
-                  onPressed: _openEmoteSheet,
+                child: GestureDetector(
+                  onTap: _openEmoteSheet,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Image.asset(
+                        'assets/images/button.png',
+                        width: 160,
+                        height: 60,
+                        fit: BoxFit.contain,
+                      ),
+                      const Text(
+                        'Emotes',
+                        style: TextStyle(
+                          fontFamily: 'VT323',
+                          fontSize: 28,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               if (isLoading)
@@ -464,12 +559,16 @@ class _EmoteButtonState extends State<_EmoteButton> {
 }
 
 class _EmotePicker extends StatelessWidget {
-  const _EmotePicker();
+  const _EmotePicker({required this.onEmoteSelected});
+
+  final ValueChanged<Emote> onEmoteSelected;
 
   void _sendEmote(BuildContext context, Emote emote) {
     final socketService = context.read<SocketService>();
     socketService.sendEmote(emote.id);
     Navigator.of(context).pop();
+
+    onEmoteSelected(emote);
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -578,10 +677,14 @@ class _EmotePicker extends StatelessWidget {
                                       emote.spritePath,
                                       width: 64,
                                       height: 64,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        return const Icon(Icons.emoji_emotions,
-                                            color: Colors.white54, size: 32);
-                                      },
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                            return const Icon(
+                                              Icons.emoji_emotions,
+                                              color: Colors.white54,
+                                              size: 32,
+                                            );
+                                          },
                                     ),
                                   ),
                                 ),
