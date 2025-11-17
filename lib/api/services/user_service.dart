@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:cajucards/api/api_client.dart';
+import 'package:cajucards/models/emote.dart';
 import 'package:cajucards/models/player.dart';
 
 class UserService {
@@ -15,6 +16,22 @@ class UserService {
       return Player.fromJson(decoded['data']['user']);
     } else {
       throw Exception('Falha ao carregar o perfil do cajuicer.');
+    }
+  }
+
+  Future<List<Emote>> getUserEmotes() async {
+    final response = await _apiClient.get('/users/me/emotes', requireAuth: true);
+
+    if (response.statusCode == 200) {
+      final decoded = json.decode(response.body);
+      final emotes = decoded['data']['emotes'] as List<dynamic>;
+
+      return emotes
+          .map((emote) => Emote.fromJson(emote as Map<String, dynamic>))
+          .toList();
+    } else {
+      final decoded = json.decode(response.body);
+      throw Exception(decoded['message'] ?? 'Falha ao carregar emotes.');
     }
   }
 
