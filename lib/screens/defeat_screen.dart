@@ -1,6 +1,8 @@
 import 'package:cajucards/screens/matchmaking_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:cajucards/screens/battle_screen.dart';
+import 'package:provider/provider.dart';
+import 'package:cajucards/api/services/socket_service.dart';
 
 // 1. Convertido para StatefulWidget
 class DefeatScreen extends StatefulWidget {
@@ -104,13 +106,18 @@ class _DefeatScreenState extends State<DefeatScreen>
                       context: context,
                       text: 'Sim',
                       onTap: () {
-                        Navigator.pushReplacement(
-                          context,
-                          PageRouteBuilder(
-                            pageBuilder: (_, __, ___) => const MatchmakingScreen(),
-                            transitionDuration: Duration.zero,
-                          ),
-                        );
+                        Provider.of<SocketService>(context, listen: false)
+                                  .findMatch();
+
+                              Navigator.pushReplacement(
+                                context,
+                                PageRouteBuilder(
+                                  pageBuilder: (_, __, ___) =>
+                                      const MatchmakingScreen(),
+                                  transitionDuration: Duration.zero,
+                                  reverseTransitionDuration: Duration.zero,
+                                ),
+                              );
                       },
                     ),
                     const SizedBox(width: 40),

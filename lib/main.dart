@@ -5,7 +5,7 @@ import 'package:cajucards/providers/player_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flame/flame.dart';
 import 'package:cajucards/api/services/socket_service.dart';
-import 'package:cajucards/api/api_client.dart'; // 1. Importe o ApiClient
+import 'package:cajucards/api/api_client.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
